@@ -21,6 +21,6 @@ export function registerDocker(cli) {
     .action(() => exitOnFailure(compose(['logs', '-f'])));
 
   cli
-    .command('docker:restart <service>', 'Restart a single container')
-    .action((service) => exitOnFailure(runCommand('docker', ['restart', service])));
+    .command('docker:restart <service>', 'Restart a single service in the dev stack')
+    .action((service) => exitOnFailure(compose(['restart', service])));
 }

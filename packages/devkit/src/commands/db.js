@@ -1,28 +1,25 @@
 import { runCommand, exitOnFailure } from '../util/run.js';
 import { requireDbConfig } from '../util/config.js';
 
+const COMPOSE_FILE = 'docker/docker-compose.dev.yml';
+const ENV_FILE = '.env';
+
+function composeExec(args, extraOpts = {}) {
+  return runCommand(
+    'docker',
+    ['compose', '--env-file', ENV_FILE, '-f', COMPOSE_FILE, 'exec', ...args],
+    extraOpts,
+  );
+}
+
 function psqlExec(sql) {
   const db = requireDbConfig();
-  return runCommand('docker', [
-    'exec',
-    db.container,
-    'psql',
-    '-U',
-    db.user,
-    '-d',
-    db.name,
-    '-c',
-    sql,
-  ]);
+  return composeExec([db.service, 'psql', '-U', db.user, '-d', db.name, '-c', sql]);
 }
 
 function psqlShell() {
   const db = requireDbConfig();
-  return runCommand(
-    'docker',
-    ['exec', '-it', db.container, 'psql', '-U', db.user, '-d', db.name],
-    { stdio: 'inherit' },
-  );
+  return composeExec([db.service, 'psql', '-U', db.user, '-d', db.name], { stdio: 'inherit' });
 }
 
 export function registerDb(cli) {

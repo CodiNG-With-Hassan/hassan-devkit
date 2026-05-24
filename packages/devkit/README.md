@@ -10,19 +10,21 @@ pnpm add -D @coding-with-hassan/devkit
 
 ## Configure
 
-Add a `hassan-devkit` block to your client repo's root `package.json` so the db commands know which container to talk to:
+Add a `hassan-devkit` block to your client repo's root `package.json` so the db commands know which compose service to address:
 
 ```json
 {
   "hassan-devkit": {
     "db": {
-      "container": "de-autozaak-db",
+      "service": "db",
       "user": "postgres",
       "name": "de_autozaak"
     }
   }
 }
 ```
+
+`service` is the docker-compose service name, **not** a hardcoded container name. The CLI runs `docker compose exec <service>`, so the project name in your compose file handles disambiguation when multiple client stacks share a host.
 
 The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at the repo root (the convention the template repo ships with).
 
@@ -48,7 +50,7 @@ The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at 
 - `hassan-devkit docker:up` — `docker compose up -d --build`
 - `hassan-devkit docker:down` — `docker compose down`
 - `hassan-devkit docker:logs` — tail logs
-- `hassan-devkit docker:restart <service>` — restart a single container by name
+- `hassan-devkit docker:restart <service>` — `docker compose restart <service>`
 
 ### Database
 

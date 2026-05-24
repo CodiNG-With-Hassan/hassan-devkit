@@ -6,9 +6,13 @@ import { resolve } from 'node:path';
  *
  *   {
  *     "hassan-devkit": {
- *       "db": { "container": "...", "user": "postgres", "name": "..." }
+ *       "db": { "service": "db", "user": "postgres", "name": "..." }
  *     }
  *   }
+ *
+ * `service` is the docker-compose service name (e.g. `db`), not a hardcoded
+ * container name. The CLI uses `docker compose exec <service>` so the project
+ * name in compose handles disambiguation across clients.
  */
 export function readDevkitConfig() {
   const pkgPath = resolve(process.cwd(), 'package.json');
@@ -22,9 +26,10 @@ export function readDevkitConfig() {
 
 export function requireDbConfig() {
   const cfg = readDevkitConfig().db;
-  if (!cfg?.container || !cfg?.user || !cfg?.name) {
+  if (!cfg?.service || !cfg?.user || !cfg?.name) {
     throw new Error(
-      'Missing db config. Add a "hassan-devkit": { "db": { "container": "...", "user": "...", "name": "..." } } block to package.json.',
+      'Missing db config. Add a "hassan-devkit": { "db": { "service": "...", "user": "...", "name": "..." } } block to package.json. ' +
+        '("service" is the compose service name, e.g. "db".)',
     );
   }
   return cfg;
