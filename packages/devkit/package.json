@@ -1,6 +1,6 @@
 {
   "name": "@coding-with-hassan/devkit",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "CLI for the developer workflow shared across Hassan's client projects: docker compose orchestration, db helpers, and husky hook installation.",
   "license": "MIT",
   "author": "Hassan Khousheish",
