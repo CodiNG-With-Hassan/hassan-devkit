@@ -1,6 +1,6 @@
 {
   "name": "@coding-with-hassan/prettier-config-api",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared Prettier config for NestJS / Node TypeScript projects.",
   "license": "MIT",
   "author": "Hassan Khousheish",
@@ -9,12 +9,20 @@
     "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
     "directory": "packages/prettier-config-api"
   },
-  "keywords": ["prettier", "prettier-config", "nestjs", "node"],
+  "keywords": [
+    "prettier",
+    "prettier-config",
+    "nestjs",
+    "node"
+  ],
   "main": "./index.json",
   "exports": {
     ".": "./index.json"
   },
-  "files": ["index.json", "README.md"],
+  "files": [
+    "index.json",
+    "README.md"
+  ],
   "peerDependencies": {
     "prettier": ">=3"
   },
