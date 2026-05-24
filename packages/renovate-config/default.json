@@ -13,28 +13,28 @@
   "packageRules": [
     {
       "description": "Group all @coding-with-hassan/* devkit bumps into a single PR.",
-      "matchPackagePatterns": ["^@coding-with-hassan/"],
+      "matchPackageNames": ["/^@coding-with-hassan//"],
       "groupName": "hassan-devkit",
       "schedule": ["at any time"]
     },
     {
       "description": "Group Angular framework packages.",
-      "matchPackagePatterns": ["^@angular/", "^@angular-eslint/", "^angular-eslint$"],
+      "matchPackageNames": ["/^@angular//", "/^@angular-eslint//", "angular-eslint"],
       "groupName": "angular"
     },
     {
       "description": "Group NestJS framework packages.",
-      "matchPackagePatterns": ["^@nestjs/"],
+      "matchPackageNames": ["/^@nestjs//"],
       "groupName": "nestjs"
     },
     {
       "description": "Group PrimeNG packages.",
-      "matchPackagePatterns": ["^primeng$", "^primeicons$", "^@primeuix/"],
+      "matchPackageNames": ["primeng", "primeicons", "/^@primeuix//"],
       "groupName": "primeng"
     },
     {
       "description": "Group NgRx packages.",
-      "matchPackagePatterns": ["^@ngrx/"],
+      "matchPackageNames": ["/^@ngrx//"],
       "groupName": "ngrx"
     },
     {
