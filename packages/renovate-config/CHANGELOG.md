@@ -1,5 +1,11 @@
 # @coding-with-hassan/renovate-config
 
+## 0.1.1
+
+### Patch Changes
+
+- 21efa34: Replace deprecated `matchPackagePatterns` with `matchPackageNames` (and the `/regex/` form). Recent Renovate versions reject the deprecated key outright, which would stop PRs in any consumer repo. Behaviour of the grouped rules is unchanged.
+
 ## 0.1.0
 
 ### Minor Changes
