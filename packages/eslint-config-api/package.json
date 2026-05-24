@@ -1,6 +1,6 @@
 {
   "name": "@coding-with-hassan/eslint-config-api",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared ESLint flat config for NestJS / Node TypeScript projects.",
   "license": "MIT",
   "author": "Hassan Khousheish",
@@ -9,13 +9,22 @@
     "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
     "directory": "packages/eslint-config-api"
   },
-  "keywords": ["eslint", "eslintconfig", "nestjs", "typescript", "node"],
+  "keywords": [
+    "eslint",
+    "eslintconfig",
+    "nestjs",
+    "typescript",
+    "node"
+  ],
   "type": "module",
   "main": "./index.js",
   "exports": {
     ".": "./index.js"
   },
-  "files": ["index.js", "README.md"],
+  "files": [
+    "index.js",
+    "README.md"
+  ],
   "peerDependencies": {
     "eslint": ">=9",
     "typescript": ">=5"

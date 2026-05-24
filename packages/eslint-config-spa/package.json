@@ -1,6 +1,6 @@
 {
   "name": "@coding-with-hassan/eslint-config-spa",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared ESLint flat config for Angular projects.",
   "license": "MIT",
   "author": "Hassan Khousheish",
@@ -9,12 +9,20 @@
     "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
     "directory": "packages/eslint-config-spa"
   },
-  "keywords": ["eslint", "eslintconfig", "angular", "typescript"],
+  "keywords": [
+    "eslint",
+    "eslintconfig",
+    "angular",
+    "typescript"
+  ],
   "main": "./index.js",
   "exports": {
     ".": "./index.js"
   },
-  "files": ["index.js", "README.md"],
+  "files": [
+    "index.js",
+    "README.md"
+  ],
   "peerDependencies": {
     "eslint": ">=9",
     "typescript": ">=5"
