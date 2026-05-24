@@ -1,5 +1,5 @@
 {
-  "name": "@hassan/eslint-config-api",
+  "name": "@coding-with-hassan/eslint-config-api",
   "version": "0.1.0",
   "description": "Shared ESLint flat config for NestJS / Node TypeScript projects.",
   "license": "MIT",

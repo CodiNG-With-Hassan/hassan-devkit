@@ -1,5 +1,5 @@
 {
-  "name": "@hassan/prettier-config-api",
+  "name": "@coding-with-hassan/prettier-config-api",
   "version": "0.1.0",
   "description": "Shared Prettier config for NestJS / Node TypeScript projects.",
   "license": "MIT",

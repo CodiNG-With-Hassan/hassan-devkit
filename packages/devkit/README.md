@@ -1,11 +1,11 @@
-# @hassan/devkit
+# @coding-with-hassan/devkit
 
 CLI that wraps the developer workflow shared across Hassan's client projects: docker compose orchestration, postgres helpers, and the husky pre-commit hook.
 
 ## Install
 
 ```sh
-pnpm add -D @hassan/devkit
+pnpm add -D @coding-with-hassan/devkit
 ```
 
 ## Configure
@@ -60,7 +60,7 @@ The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at 
 
 ### Husky hooks
 
-- `hassan-devkit hooks:install` — installs husky if needed, then writes the shared `pre-commit` hook content into `.husky/pre-commit`. Re-run after bumping `@hassan/devkit` to pick up changes to the hook.
+- `hassan-devkit hooks:install` — installs husky if needed, then writes the shared `pre-commit` hook content into `.husky/pre-commit`. Re-run after bumping `@coding-with-hassan/devkit` to pick up changes to the hook.
 - `hassan-devkit pre-commit` — runs the hook body directly. Used internally; the installed `.husky/pre-commit` file invokes this.
 - `hassan-devkit hooks:print` — print the hook content to stdout (for inspection / diffing).
 

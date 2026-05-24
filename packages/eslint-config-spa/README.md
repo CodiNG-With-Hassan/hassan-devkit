@@ -1,11 +1,11 @@
-# @hassan/eslint-config-spa
+# @coding-with-hassan/eslint-config-spa
 
 Shared ESLint flat config for Angular projects.
 
 ## Install
 
 ```sh
-pnpm add -D @hassan/eslint-config-spa eslint typescript
+pnpm add -D @coding-with-hassan/eslint-config-spa eslint typescript
 ```
 
 ## Use
@@ -13,7 +13,7 @@ pnpm add -D @hassan/eslint-config-spa eslint typescript
 Create `eslint.config.js` in your Angular project root:
 
 ```js
-module.exports = require('@hassan/eslint-config-spa')({ prefix: 'app' });
+module.exports = require('@coding-with-hassan/eslint-config-spa')({ prefix: 'app' });
 ```
 
 The `prefix` is the selector prefix used for both component (`<app-foo>`) and directive (`appFoo`) selector rules. Each client typically picks its own — e.g. `bridal`, `autozaak`, `lpx`.
@@ -21,7 +21,7 @@ The `prefix` is the selector prefix used for both component (`<app-foo>`) and di
 For project-specific extras (a custom rule, a folder-specific override), pass an `extra` array of additional flat-config entries:
 
 ```js
-module.exports = require('@hassan/eslint-config-spa')({
+module.exports = require('@coding-with-hassan/eslint-config-spa')({
   prefix: 'autozaak',
   extra: [
     {

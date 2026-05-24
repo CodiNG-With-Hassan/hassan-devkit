@@ -1,5 +1,5 @@
 {
-  "name": "@hassan/prettier-config-spa",
+  "name": "@coding-with-hassan/prettier-config-spa",
   "version": "0.1.0",
   "description": "Shared Prettier config for Angular projects.",
   "license": "MIT",

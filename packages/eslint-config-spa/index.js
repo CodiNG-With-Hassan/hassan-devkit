@@ -10,7 +10,7 @@ const prettier = require('eslint-config-prettier/flat');
  *
  * Usage in a consumer's eslint.config.js:
  *
- *   module.exports = require('@hassan/eslint-config-spa')({ prefix: 'app' });
+ *   module.exports = require('@coding-with-hassan/eslint-config-spa')({ prefix: 'app' });
  *
  * @param {{ prefix?: string, extra?: any[] }} [opts]
  */

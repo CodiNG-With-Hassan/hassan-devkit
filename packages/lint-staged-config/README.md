@@ -1,11 +1,11 @@
-# @hassan/lint-staged-config
+# @coding-with-hassan/lint-staged-config
 
 Project-aware [lint-staged](https://github.com/lint-staged/lint-staged) config factory. Designed for monorepos where a NestJS API and an Angular SPA live in sibling folders at the repo root.
 
 ## Install
 
 ```sh
-pnpm add -D @hassan/lint-staged-config lint-staged
+pnpm add -D @coding-with-hassan/lint-staged-config lint-staged
 ```
 
 ## Use
@@ -13,7 +13,7 @@ pnpm add -D @hassan/lint-staged-config lint-staged
 Create `lint-staged.config.js` at the repo root:
 
 ```js
-module.exports = require('@hassan/lint-staged-config')({
+module.exports = require('@coding-with-hassan/lint-staged-config')({
   api: 'de-autozaak-car-rental',
   spa: 'de-autozaak-car-rental-spa',
 });

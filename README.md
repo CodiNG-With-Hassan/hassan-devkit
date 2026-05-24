@@ -6,13 +6,13 @@ A small ecosystem of shared developer-experience packages that I use across the 
 
 | Package | What it is |
 |---|---|
-| [`@hassan/eslint-config-api`](./packages/eslint-config-api) | NestJS / Node ESLint flat config |
-| [`@hassan/eslint-config-spa`](./packages/eslint-config-spa) | Angular ESLint flat config |
-| [`@hassan/prettier-config-api`](./packages/prettier-config-api) | Prettier preset for backend TS |
-| [`@hassan/prettier-config-spa`](./packages/prettier-config-spa) | Prettier preset for Angular |
-| [`@hassan/lint-staged-config`](./packages/lint-staged-config) | Project-aware lint-staged config for split monorepos |
-| [`@hassan/renovate-config`](./packages/renovate-config) | Renovate preset that groups `@hassan/*` bumps |
-| [`@hassan/devkit`](./packages/devkit) | CLI for docker compose, db helpers, and husky hooks |
+| [`@coding-with-hassan/eslint-config-api`](./packages/eslint-config-api) | NestJS / Node ESLint flat config |
+| [`@coding-with-hassan/eslint-config-spa`](./packages/eslint-config-spa) | Angular ESLint flat config |
+| [`@coding-with-hassan/prettier-config-api`](./packages/prettier-config-api) | Prettier preset for backend TS |
+| [`@coding-with-hassan/prettier-config-spa`](./packages/prettier-config-spa) | Prettier preset for Angular |
+| [`@coding-with-hassan/lint-staged-config`](./packages/lint-staged-config) | Project-aware lint-staged config for split monorepos |
+| [`@coding-with-hassan/renovate-config`](./packages/renovate-config) | Renovate preset that groups `@coding-with-hassan/*` bumps |
+| [`@coding-with-hassan/devkit`](./packages/devkit) | CLI for docker compose, db helpers, and husky hooks |
 
 ## Companion template
 

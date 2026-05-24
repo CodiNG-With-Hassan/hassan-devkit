@@ -12,8 +12,8 @@
   "rangeStrategy": "bump",
   "packageRules": [
     {
-      "description": "Group all @hassan/* devkit bumps into a single PR.",
-      "matchPackagePatterns": ["^@hassan/"],
+      "description": "Group all @coding-with-hassan/* devkit bumps into a single PR.",
+      "matchPackagePatterns": ["^@coding-with-hassan/"],
       "groupName": "hassan-devkit",
       "schedule": ["at any time"]
     },

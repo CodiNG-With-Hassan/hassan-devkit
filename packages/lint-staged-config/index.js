@@ -3,7 +3,7 @@
  *
  * Build it in a top-level `lint-staged.config.js` (or `.lintstagedrc.js`):
  *
- *   module.exports = require('@hassan/lint-staged-config')({
+ *   module.exports = require('@coding-with-hassan/lint-staged-config')({
  *     api: 'de-autozaak-car-rental',
  *     spa: 'de-autozaak-car-rental-spa',
  *   });

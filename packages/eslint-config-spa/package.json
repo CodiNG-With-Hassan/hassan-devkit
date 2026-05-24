@@ -1,5 +1,5 @@
 {
-  "name": "@hassan/eslint-config-spa",
+  "name": "@coding-with-hassan/eslint-config-spa",
   "version": "0.1.0",
   "description": "Shared ESLint flat config for Angular projects.",
   "license": "MIT",

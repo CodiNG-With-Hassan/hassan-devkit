@@ -9,7 +9,7 @@ import tseslint from 'typescript-eslint';
  *
  * Usage in a consumer's eslint.config.mjs:
  *
- *   import config from '@hassan/eslint-config-api';
+ *   import config from '@coding-with-hassan/eslint-config-api';
  *   export default config({ tsconfigRootDir: import.meta.dirname });
  *
  * @param {{ tsconfigRootDir: string, extra?: import('typescript-eslint').ConfigArray }} opts

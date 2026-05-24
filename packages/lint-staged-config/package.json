@@ -1,5 +1,5 @@
 {
-  "name": "@hassan/lint-staged-config",
+  "name": "@coding-with-hassan/lint-staged-config",
   "version": "0.1.0",
   "description": "Project-aware lint-staged config for monorepos with a NestJS API and an Angular SPA side by side.",
   "license": "MIT",

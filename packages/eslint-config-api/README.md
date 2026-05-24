@@ -1,11 +1,11 @@
-# @hassan/eslint-config-api
+# @coding-with-hassan/eslint-config-api
 
 Shared ESLint flat config for NestJS / Node TypeScript projects.
 
 ## Install
 
 ```sh
-pnpm add -D @hassan/eslint-config-api eslint typescript
+pnpm add -D @coding-with-hassan/eslint-config-api eslint typescript
 ```
 
 ## Use
@@ -13,7 +13,7 @@ pnpm add -D @hassan/eslint-config-api eslint typescript
 Create `eslint.config.mjs` in your project root:
 
 ```js
-import config from '@hassan/eslint-config-api';
+import config from '@coding-with-hassan/eslint-config-api';
 
 export default config({
   tsconfigRootDir: import.meta.dirname,
@@ -23,7 +23,7 @@ export default config({
 Need a project-specific override? Pass an `extra` array of additional flat-config entries — they are appended after the base config:
 
 ```js
-import config from '@hassan/eslint-config-api';
+import config from '@coding-with-hassan/eslint-config-api';
 
 export default config({
   tsconfigRootDir: import.meta.dirname,

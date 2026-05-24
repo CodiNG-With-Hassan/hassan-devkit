@@ -1,6 +1,6 @@
-# @hassan/renovate-config
+# @coding-with-hassan/renovate-config
 
-Shared [Renovate](https://docs.renovatebot.com/) preset for client repos that consume the `@hassan/*` devkit. It groups upgrades into meaningful PRs so a busy dependency week doesn't drown your inbox.
+Shared [Renovate](https://docs.renovatebot.com/) preset for client repos that consume the `@coding-with-hassan/*` devkit. It groups upgrades into meaningful PRs so a busy dependency week doesn't drown your inbox.
 
 ## Use
 
@@ -13,14 +13,14 @@ Create `renovate.json` at the root of a client repo:
 }
 ```
 
-Renovate resolves presets directly from GitHub, so this preset works without you needing to install anything in the client repo. (The preset is also published to npm under `@hassan/renovate-config` for npm-based consumers.)
+Renovate resolves presets directly from GitHub, so this preset works without you needing to install anything in the client repo. (The preset is also published to npm under `@coding-with-hassan/renovate-config` for npm-based consumers.)
 
 ## What it does
 
 - Runs weekly, Monday before 6am Amsterdam time.
 - Caps concurrent open PRs at 5, hourly creation at 2.
 - Groups updates so each PR is meaningful instead of one-per-package:
-  - `@hassan/*` — your own devkit bumps, runs at any time (not gated by the weekly schedule).
+  - `@coding-with-hassan/*` — your own devkit bumps, runs at any time (not gated by the weekly schedule).
   - `@angular/*`, `angular-eslint`, `@angular-eslint/*` — Angular framework.
   - `@nestjs/*` — NestJS framework.
   - `primeng`, `primeicons`, `@primeuix/*` — PrimeNG.
