@@ -11,12 +11,12 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/**\" run build --if-present",
-    "lint": "pnpm -r --filter \"./packages/**\" run lint --if-present",
-    "test": "pnpm -r --filter \"./packages/**\" run test --if-present",
+    "build": "echo 'no build step — packages ship plain JS/JSON'",
+    "lint": "echo 'no shared lint step yet'",
+    "test": "echo 'no tests yet'",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.10"
