@@ -1,0 +1,24 @@
+{
+  "name": "@hassan/lint-staged-config",
+  "version": "0.1.0",
+  "description": "Project-aware lint-staged config for monorepos with a NestJS API and an Angular SPA side by side.",
+  "license": "MIT",
+  "author": "Hassan Khousheish",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
+    "directory": "packages/lint-staged-config"
+  },
+  "keywords": ["lint-staged", "husky", "monorepo"],
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": ["index.js", "README.md"],
+  "peerDependencies": {
+    "lint-staged": ">=15"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Amsterdam",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "description": "Group all @hassan/* devkit bumps into a single PR.",
+      "matchPackagePatterns": ["^@hassan/"],
+      "groupName": "hassan-devkit",
+      "schedule": ["at any time"]
+    },
+    {
+      "description": "Group Angular framework packages.",
+      "matchPackagePatterns": ["^@angular/", "^@angular-eslint/", "^angular-eslint$"],
+      "groupName": "angular"
+    },
+    {
+      "description": "Group NestJS framework packages.",
+      "matchPackagePatterns": ["^@nestjs/"],
+      "groupName": "nestjs"
+    },
+    {
+      "description": "Group PrimeNG packages.",
+      "matchPackagePatterns": ["^primeng$", "^primeicons$", "^@primeuix/"],
+      "groupName": "primeng"
+    },
+    {
+      "description": "Group NgRx packages.",
+      "matchPackagePatterns": ["^@ngrx/"],
+      "groupName": "ngrx"
+    },
+    {
+      "description": "Group TypeORM + pg.",
+      "matchPackageNames": ["typeorm", "pg"],
+      "groupName": "typeorm"
+    },
+    {
+      "description": "Pin GitHub Actions to digests.",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    }
+  ]
+}

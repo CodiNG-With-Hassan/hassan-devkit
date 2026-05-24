@@ -1,0 +1,21 @@
+{
+  "name": "@hassan/renovate-config",
+  "version": "0.1.0",
+  "description": "Renovate preset for client repos consuming the hassan-devkit ecosystem.",
+  "license": "MIT",
+  "author": "Hassan Khousheish",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
+    "directory": "packages/renovate-config"
+  },
+  "keywords": ["renovate", "renovate-config", "preset"],
+  "main": "./default.json",
+  "exports": {
+    ".": "./default.json"
+  },
+  "files": ["default.json", "README.md"],
+  "publishConfig": {
+    "access": "public"
+  }
+}

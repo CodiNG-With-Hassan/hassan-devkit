@@ -1,0 +1,27 @@
+{
+  "name": "@hassan/devkit",
+  "version": "0.1.0",
+  "description": "CLI for the developer workflow shared across Hassan's client projects: docker compose orchestration, db helpers, and husky hook installation.",
+  "license": "MIT",
+  "author": "Hassan Khousheish",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
+    "directory": "packages/devkit"
+  },
+  "keywords": ["cli", "docker", "husky", "lint-staged", "monorepo"],
+  "type": "module",
+  "bin": {
+    "hassan-devkit": "./bin/cli.js"
+  },
+  "files": ["bin", "src", "hooks", "README.md"],
+  "dependencies": {
+    "cac": "^6.7.14"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

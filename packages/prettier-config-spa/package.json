@@ -1,0 +1,24 @@
+{
+  "name": "@hassan/prettier-config-spa",
+  "version": "0.1.0",
+  "description": "Shared Prettier config for Angular projects.",
+  "license": "MIT",
+  "author": "Hassan Khousheish",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CodiNG-With-Hassan/hassan-devkit.git",
+    "directory": "packages/prettier-config-spa"
+  },
+  "keywords": ["prettier", "prettier-config", "angular"],
+  "main": "./index.json",
+  "exports": {
+    ".": "./index.json"
+  },
+  "files": ["index.json", "README.md"],
+  "peerDependencies": {
+    "prettier": ">=3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
