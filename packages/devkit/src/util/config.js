@@ -34,3 +34,18 @@ export function requireDbConfig() {
   }
   return cfg;
 }
+
+/**
+ * Read the optional `i18n` config block, applying defaults. `dir` is resolved
+ * relative to the consumer's cwd; in a monorepo point it at the app, e.g.
+ * "spa/public/assets/i18n".
+ *
+ *   "hassan-devkit": { "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] } }
+ */
+export function readI18nConfig() {
+  const cfg = readDevkitConfig().i18n ?? {};
+  return {
+    dir: cfg.dir ?? 'public/assets/i18n',
+    languages: cfg.languages ?? ['en', 'nl'],
+  };
+}

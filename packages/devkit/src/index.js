@@ -2,6 +2,7 @@ import { cac } from 'cac';
 import { registerDocker } from './commands/docker.js';
 import { registerDb } from './commands/db.js';
 import { registerHooks } from './commands/hooks.js';
+import { registerI18n } from './commands/i18n.js';
 
 export function run(argv) {
   const cli = cac('hassan-devkit');
@@ -9,6 +10,7 @@ export function run(argv) {
   registerDocker(cli);
   registerDb(cli);
   registerHooks(cli);
+  registerI18n(cli);
 
   cli.help();
   cli.version(readVersion());

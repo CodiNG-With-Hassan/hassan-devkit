@@ -6,5 +6,8 @@ if [ -f "scripts/pre-commit-extra.sh" ]; then
   sh scripts/pre-commit-extra.sh || exit 1
 fi
 
+# Validate translation keys (no-op if the project has no i18n directory)
+pnpm exec hassan-devkit i18n:check || exit 1
+
 # Project-aware lint/format on staged files
 pnpm exec lint-staged

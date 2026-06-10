@@ -60,6 +60,22 @@ The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at 
 - `hassan-devkit db:truncate <table>` — `TRUNCATE TABLE <table> CASCADE`
 - `hassan-devkit db:psql` — interactive psql shell
 
+### i18n
+
+- `hassan-devkit i18n:check` — validates translation JSON: flags keys missing from any language file and enforces UPPERCASE_SNAKE_CASE key naming. Add `--detailed` (per-module key counts) or `--detailed --show-keys` to inspect. No-ops when the project has no i18n directory, and runs automatically in the shared pre-commit hook.
+
+  Configure via the `hassan-devkit.i18n` block in package.json (both fields optional):
+
+  ```json
+  {
+    "hassan-devkit": {
+      "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] }
+    }
+  }
+  ```
+
+  `dir` is resolved from the repo root — in a monorepo point it at the app (e.g. `spa/public/assets/i18n`). Defaults: `public/assets/i18n` and `["en", "nl"]`.
+
 ### Husky hooks
 
 - `hassan-devkit hooks:install` — installs husky if needed, then writes the shared `pre-commit` hook content into `.husky/pre-commit`. Re-run after bumping `@coding-with-hassan/devkit` to pick up changes to the hook.
@@ -68,4 +84,4 @@ The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at 
 
 ### Per-project extras
 
-If a project needs to run something extra before the standard lint-staged step (e.g., the de-autozaak SPA's translation consistency check), drop a `scripts/pre-commit-extra.sh` in the repo root. It runs first, must `exit 0` to continue.
+If a project needs to run something extra before the standard `i18n:check` + lint-staged steps, drop a `scripts/pre-commit-extra.sh` in the repo root. It runs first, must `exit 0` to continue. (Translation consistency is now built in via `i18n:check` — see above — so it no longer belongs here.)
