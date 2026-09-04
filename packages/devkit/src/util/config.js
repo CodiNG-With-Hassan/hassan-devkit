@@ -49,3 +49,17 @@ export function readI18nConfig() {
     languages: cfg.languages ?? ['en', 'nl'],
   };
 }
+
+/**
+ * Read the optional `docker` config block. `preUp` is a shell command that
+ * `docker:up` runs from the consumer's cwd BEFORE composing the stack, so a
+ * project can refresh whatever its compose file reads from `.env` (image
+ * tags, profiles, ports) on every up. A non-zero exit aborts the up.
+ *
+ *   "hassan-devkit": { "docker": { "preUp": "scripts/worktree.sh env" } }
+ */
+export function readDockerConfig() {
+  const cfg = readDevkitConfig().docker ?? {};
+  const preUp = typeof cfg.preUp === 'string' ? cfg.preUp.trim() : '';
+  return { preUp: preUp || null };
+}
