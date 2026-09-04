@@ -28,6 +28,16 @@ Add a `hassan-devkit` block to your client repo's root `package.json` so the db 
 
 The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at the repo root (the convention the template repo ships with).
 
+Optionally add a `docker.preUp` hook — a shell command `docker:up` runs from the repo root right before `docker compose up`. Use it to refresh values your compose file reads from `.env` (image tags derived from the lockfile, compose profiles, ports) so they can never go stale between ups; a non-zero exit aborts the up:
+
+```json
+{
+  "hassan-devkit": {
+    "docker": { "preUp": "scripts/worktree.sh env" }
+  }
+}
+```
+
 ## Wire it into your scripts
 
 ```json
@@ -47,7 +57,7 @@ The docker commands assume `docker/docker-compose.dev.yml` and a `.env` file at 
 
 ### Docker
 
-- `hassan-devkit docker:up` — `docker compose up -d --build`
+- `hassan-devkit docker:up` — runs the `docker.preUp` hook when configured, then `docker compose up -d --build`
 - `hassan-devkit docker:down` — `docker compose down`
 - `hassan-devkit docker:logs` — tail logs
 - `hassan-devkit docker:restart <service>` — `docker compose restart <service>`
