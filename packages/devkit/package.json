@@ -24,6 +24,7 @@
     "bin",
     "src",
     "hooks",
+    "lint-staged.js",
     "README.md"
   ],
   "dependencies": {
@@ -38,5 +39,10 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./lint-staged": "./lint-staged.js",
+    "./package.json": "./package.json"
   }
 }
