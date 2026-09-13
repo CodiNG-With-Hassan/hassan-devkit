@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { init } from '../src/commands/init.js';
+import { INIT_PARTS, init, parseOnly } from '../src/commands/init.js';
 import { MANAGED_MARKER, parseEnv } from '../src/core/env-block.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
@@ -115,4 +115,19 @@ test('init with testCases configured and no data scaffolds a loadable starter su
   const again = await init({ root, log: quiet });
   assert.ok(!again.created.includes('docs/testing/tc-data-app.ts') && !again.overwritten.includes('docs/testing/tc-data-app.ts'), 'existing data is left alone');
   assert.equal(readFileSync(join(root, 'docs/testing/tc-data-app.ts'), 'utf8'), starter);
+});
+
+test('init --only restricts the run to the named parts and rejects unknown ones', async () => {
+  assert.equal(parseOnly(undefined), null);
+  assert.deepEqual([...parseOnly('config, claude')], ['config', 'claude']);
+  assert.throws(() => parseOnly('config,nope'), /unknown init part\(s\) nope — known: config, env, hooks, agents, ci, claude, test-cases/);
+  assert.deepEqual(Object.keys(INIT_PARTS), ['config', 'env', 'hooks', 'agents', 'ci', 'claude', 'test-cases']);
+
+  const root = freshCopy();
+  const first = await init({ root, only: 'config', log: quiet });
+  assert.deepEqual([...first.created, ...first.updated], ['package.json']);
+  assert.ok(!existsSync(join(root, 'lint-staged.config.mjs')) && !existsSync(join(root, '.claude')) && !existsSync(join(root, 'docs/agents')));
+  const second = await init({ root, only: ['claude', 'agents'], log: quiet });
+  assert.deepEqual(second.created.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
+  assert.ok(!existsSync(join(root, '.github/workflows/ci.yml')));
 });
