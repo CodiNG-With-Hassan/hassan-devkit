@@ -4,6 +4,7 @@ import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, loadConfig, resolveConfig } fr
 import { managedValues, writeManagedBlock } from '../core/env-block.js';
 import { agentsDocs } from '../core/agents-docs.js';
 import { WORKFLOW_PATH, renderWorkflow } from '../core/ci/workflow.js';
+import { claudePlans } from '../core/claude.js';
 import { applyPlan, formatJson, mergeMissing, planFile } from '../core/scaffold.js';
 import { exitOnFailure } from '../util/run.js';
 
@@ -33,7 +34,8 @@ const DOCKER_SCRIPTS = {
   'docker:dev:down': 'hassan-devkit docker:down',
   'docker:dev:logs': 'hassan-devkit docker:logs',
 };
-const HOOK_SCRIPTS = { prepare: 'hassan-devkit hooks:install' };
+const HOOK_SCRIPTS = { prepare: 'hassan-devkit hooks:install && hassan-devkit claude:install' };
+const CLAUDE_ONLY_SCRIPTS = { prepare: 'hassan-devkit claude:install' };
 const SCRIPT_DEFAULTS = { ...DOCKER_SCRIPTS, ...HOOK_SCRIPTS };
 
 const usesHusky = (pkg) => Boolean(pkg.devDependencies?.husky || pkg.dependencies?.husky);
@@ -66,7 +68,7 @@ export function planPackageJson(root, pkg) {
   next[CONFIG_KEY] ??= {};
   added.push(...mergeMissing(next[CONFIG_KEY], structuredClone(CONFIG_SKELETON), CONFIG_KEY));
   next.scripts ??= {};
-  const scripts = { ...(existsSync(join(root, COMPOSE_FILE)) ? DOCKER_SCRIPTS : {}), ...(usesHusky(pkg) ? HOOK_SCRIPTS : {}) };
+  const scripts = { ...(existsSync(join(root, COMPOSE_FILE)) ? DOCKER_SCRIPTS : {}), ...(usesHusky(pkg) ? HOOK_SCRIPTS : CLAUDE_ONLY_SCRIPTS) };
   added.push(...mergeMissing(next.scripts, scripts, 'scripts'));
   return { plan: planFile(root, 'package.json', formatJson(next), { managed: true }), added, next };
 }
@@ -119,6 +121,8 @@ export function buildPlans(loaded, notes = []) {
   if (existsSync(join(root, 'nx.json'))) {
     plans.push(planFile(root, WORKFLOW_PATH, renderWorkflow({ nodeVersion: effective.ci.nodeVersion, baseBranch: effective.ci.baseBranch, exemptAuthors: effective.commits.exemptAuthors })));
   }
+  // The Claude layer: standards import, agent/skill stubs, PR-assignee hook.
+  plans.push(...claudePlans(root));
   return plans;
 }
 

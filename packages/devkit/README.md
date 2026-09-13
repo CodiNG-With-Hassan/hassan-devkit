@@ -148,7 +148,17 @@ Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entri
 - `hassan-devkit ci:check [--base --head]` — `ci:doctor`, then `format:check` for the projects owning a changed file (content files included), then every `ci.checks[]` whose `paths` regex matches a changed file runs its `run` command.
 - `hassan-devkit ci:affected [--targets lint,build] [--base --head] [--with-content] [--dry-run]` — graph targets (`build`) for touched projects and dependents, own-files targets (`lint`, `format:check`) only for projects owning a changed file; files no target reads (docs, `ci.affected.contentOnly`) are dropped first; `ci.affected.adopted` maps files outside any project to the project whose target reads them.
 
-The Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
+### Claude Code layer
+
+`hassan-devkit claude:install` (run by `prepare` and by `init`) wires the house standards into Claude Code without copying content:
+
+- one `@import` line in the project's `CLAUDE.md` (`.claude/CLAUDE.md` when it exists) pulling `node_modules/@coding-with-hassan/devkit/claude/standards.md` — Docker via scripts, worktrees, commit/push consent + commit-writer, tickets, the acceptance-case quality gate, lint/format/CI parity, domain docs. In-repo imports load at launch without an approval dialog;
+- `.claude/agents/commit-writer.md` and `.claude/skills/implement-ticket/SKILL.md` as **stubs** whose body says "read the shipped file and follow it" — the stub never changes, the content ships with the devkit version;
+- the PR-assignee `PreToolUse` deny hook merged idempotently into `.claude/settings.json`.
+
+Project-specific rules stay in the project's own `CLAUDE.md` below the import. A devkit bump therefore changes what Claude does with nothing to re-commit.
+
+`test-cases:generate` lands in the next prerelease — see the design doc for its contract.
 
 ## Commands
 
