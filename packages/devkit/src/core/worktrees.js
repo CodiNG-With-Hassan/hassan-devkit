@@ -23,6 +23,19 @@ import { listProjects } from './workspace.js';
 
 // ───────────────────────── pure ─────────────────────────
 
+/**
+ * Is the worktree feature switched on? The block must exist AND, when the repo has a compose
+ * file, name at least one port or a default profile: `init` merges an EMPTY skeleton into
+ * every package.json, and that skeleton must stay inert until the project fills it in —
+ * otherwise `docker:up` would manage `.env` (and build a second image set) behind the
+ * project's existing tooling. A repo without a compose file needs no ports, so `{}` is active.
+ */
+export function worktreeActive(wt, { hasStack }) {
+  if (!wt) return false;
+  if (!hasStack) return true;
+  return Object.keys(wt.ports).length > 0 || wt.profiles.default.length > 0;
+}
+
 /** Compose project of a checkout: slot 0 keeps the configured name; others use the branch. */
 export function projectNameFor({ slot, branch, projectName }) {
   if (slot === 0) return projectName;
@@ -148,9 +161,12 @@ export function createContext(loaded, { log = console.log, note = (m) => console
   const { root, rootName, config } = loaded;
   const wt = config.worktree;
   if (!wt) throw new Error(`Missing "${CONFIG_KEY}.worktree" in ${join(root, 'package.json')} — add it (or run \`hassan-devkit init\`).`);
+  const hasStack = stack.hasComposeFile(root);
+  if (!worktreeActive(wt, { hasStack })) {
+    throw new Error(`"${CONFIG_KEY}.worktree" is still the empty skeleton — fill in worktree.ports (base host ports) and worktree.profiles.default before using the worktree commands; until then the stack keeps being managed by whatever the project used before.`);
+  }
   const main = git.mainRoot(root);
   const baseDir = resolve(main, wt.baseDir);
-  const hasStack = stack.hasComposeFile(root);
   let compose = null;
   if (hasStack) {
     compose = loadProfiles(root);

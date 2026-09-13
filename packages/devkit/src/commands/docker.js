@@ -15,8 +15,9 @@ async function up() {
   // for that, but still runs afterwards for anything else a project hooks in.
   const loaded = loadConfig();
   if (loaded.errors.length === 0 && loaded.config.worktree) {
-    const { cmdEnv, createContext } = await import('../core/worktrees.js');
-    await cmdEnv(createContext(loaded));
+    const { cmdEnv, createContext, worktreeActive } = await import('../core/worktrees.js');
+    // An unfilled skeleton (init's default) must not take over .env management.
+    if (worktreeActive(loaded.config.worktree, { hasStack: true })) await cmdEnv(createContext(loaded));
   }
   const { preUp } = readDockerConfig();
   if (preUp) {

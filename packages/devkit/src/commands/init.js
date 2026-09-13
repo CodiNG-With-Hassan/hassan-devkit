@@ -6,6 +6,7 @@ import { agentsDocs } from '../core/agents-docs.js';
 import { WORKFLOW_PATH, renderWorkflow } from '../core/ci/workflow.js';
 import { claudePlans } from '../core/claude.js';
 import { listDataFiles } from '../core/test-cases/generate.js';
+import { worktreeActive } from '../core/worktrees.js';
 import { applyPlan, formatJson, mergeMissing, planFile } from '../core/scaffold.js';
 import { exitOnFailure } from '../util/run.js';
 
@@ -102,9 +103,9 @@ export function planPackageJson(root, pkg) {
 /** `.env.dist` gets the slot-0 managed block so a fresh clone's `.env` starts valid. */
 export function planEnvDist(root, config, rootName) {
   const wt = config.worktree;
-  // An untouched skeleton (no ports, no profiles) would write an empty COMPOSE_PROFILES=
-  // that the compose guard rejects — wait until the project has filled the block in.
-  if (!wt || (Object.keys(wt.ports).length === 0 && wt.profiles.default.length === 0)) return null;
+  // An untouched skeleton would write an empty COMPOSE_PROFILES= that the compose guard
+  // rejects — same activation rule as the worktree commands and docker:up.
+  if (!worktreeActive(wt, { hasStack: existsSync(join(root, COMPOSE_FILE)) }) || Object.keys(wt.ports).length === 0) return null;
   const values = managedValues({
     slot: 0,
     projectName: wt.projectName ?? rootName,
@@ -121,17 +122,40 @@ export function planEnvDist(root, config, rootName) {
   return planFile(root, ENV_DIST_FILE, content, { managed: true });
 }
 
-export function buildPlans(loaded, notes = []) {
+/**
+ * The parts `init` can scaffold; `--only a,b` restricts a run to some of them so an existing
+ * repo can adopt the way of working one piece at a time (config first, the Claude layer last).
+ */
+export const INIT_PARTS = {
+  config: 'the hassan-devkit block and default scripts in package.json',
+  env: 'the slot-0 managed block in .env.dist',
+  hooks: 'the pre-commit seam and lint-staged.config.mjs',
+  agents: 'docs/agents/*.md rendered from the tracker config',
+  ci: 'the thin .github/workflows/ci.yml',
+  claude: 'the CLAUDE.md import, agent/skill stubs and the PR-assignee hook',
+  'test-cases': 'a starter docs/testing data file',
+};
+
+export function parseOnly(only) {
+  if (only === undefined || only === null || only === true) return null;
+  const parts = (Array.isArray(only) ? only : String(only).split(',')).map((p) => p.trim()).filter(Boolean);
+  const unknown = parts.filter((p) => !(p in INIT_PARTS));
+  if (unknown.length) throw new Error(`unknown init part(s) ${unknown.join(', ')} — known: ${Object.keys(INIT_PARTS).join(', ')}`);
+  return new Set(parts);
+}
+
+export function buildPlans(loaded, notes = [], { only = null } = {}) {
   const { root, rootName, pkg } = loaded;
+  const want = (part) => only === null || only.has(part);
   const plans = [];
   const { plan: pkgPlan, next } = planPackageJson(root, pkg);
-  plans.push(pkgPlan);
+  if (want('config')) plans.push(pkgPlan);
   // Resolve against the package.json we are ABOUT to write, so `.env.dist` reflects a
   // worktree block the skeleton just added.
   const effective = resolveConfig(next[CONFIG_KEY] ?? {}, { rootName });
-  const envDist = planEnvDist(root, effective, rootName);
+  const envDist = want('env') ? planEnvDist(root, effective, rootName) : null;
   if (envDist) plans.push(envDist);
-  if (usesHusky(pkg)) {
+  if (want('hooks') && usesHusky(pkg)) {
     plans.push(planFile(root, 'scripts/pre-commit-extra.sh', PRE_COMMIT_EXTRA, { mode: 0o755 }));
     // lint-staged only reads one config file; a legacy hand-written `.js` must go first.
     const legacy = ['lint-staged.config.js', 'lint-staged.config.cjs', '.lintstagedrc', '.lintstagedrc.js', '.lintstagedrc.json'].find((f) => existsSync(join(root, f)));
@@ -140,30 +164,31 @@ export function buildPlans(loaded, notes = []) {
   }
   // The skills' tracker/label/domain adapters are a function of the tracker config: managed,
   // so a tracker change (or a devkit bump that rewords them) flows on the next init.
-  for (const [path, content] of agentsDocs(effective.tracker)) plans.push(planFile(root, path, content, { managed: true }));
+  if (want('agents')) for (const [path, content] of agentsDocs(effective.tracker)) plans.push(planFile(root, path, content, { managed: true }));
   // The thin CI workflow: only for Nx workspaces (ci:affected / ci:cache need nx). Not
   // managed — a project may have edited it, so drift is reported by ci:doctor and fixed
   // with --force.
-  if (existsSync(join(root, 'nx.json'))) {
+  if (want('ci') && existsSync(join(root, 'nx.json'))) {
     plans.push(planFile(root, WORKFLOW_PATH, renderWorkflow({ nodeVersion: effective.ci.nodeVersion, baseBranch: effective.ci.baseBranch, exemptAuthors: effective.commits.exemptAuthors })));
   }
   // The Claude layer: standards import, agent/skill stubs, PR-assignee hook.
-  plans.push(...claudePlans(root));
+  if (want('claude')) plans.push(...claudePlans(root));
   // Acceptance cases: a starter data file when the section is configured and none exists.
-  if (effective.testCases && listDataFiles(join(root, effective.testCases.dir)).length === 0) {
+  if (want('test-cases') && effective.testCases && listDataFiles(join(root, effective.testCases.dir)).length === 0) {
     plans.push(planFile(root, `${effective.testCases.dir}/tc-data-app.ts`, TC_DATA_STARTER));
   }
   return plans;
 }
 
-export async function init({ force = false, dryRun = false, cwd = process.cwd(), root, log = console.log } = {}) {
+export async function init({ force = false, dryRun = false, only, cwd = process.cwd(), root, log = console.log } = {}) {
+  const parts = parseOnly(only);
   const loaded = loadConfig({ cwd, root });
   if (loaded.errors.length > 0) {
     throw new Error(`Fix the "${CONFIG_KEY}" block first:\n  - ${loaded.errors.join('\n  - ')}`);
   }
-  log(`hassan-devkit init → ${loaded.root}${dryRun ? '  (dry run)' : ''}`);
+  log(`hassan-devkit init → ${loaded.root}${parts ? `  (only: ${[...parts].join(', ')})` : ''}${dryRun ? '  (dry run)' : ''}`);
   const notes = [];
-  const summary = applyPlan(loaded.root, buildPlans(loaded, notes), { force, dryRun, log });
+  const summary = applyPlan(loaded.root, buildPlans(loaded, notes, { only: parts }), { force, dryRun, log });
   for (const n of notes) log(`  note: ${n}`);
   const next = [
     `Fill in "${CONFIG_KEY}" in package.json (ports, profiles, seeds, tracker) and re-run \`hassan-devkit init\` to refresh ${ENV_DIST_FILE}.`,
@@ -178,7 +203,8 @@ export function registerInit(cli) {
     .command('init', 'Scaffold the devkit way of working into this workspace (idempotent; --force overwrites edited files)')
     .option('--force', 'Overwrite files that differ from the template (a diff is printed first)')
     .option('--dry-run', 'Show what would change without writing')
-    .action((opts) => exitOnFailure(init({ force: Boolean(opts.force), dryRun: Boolean(opts.dryRun) })));
+    .option('--only <parts>', `Scaffold only these parts (comma-separated): ${Object.keys(INIT_PARTS).join(', ')}`)
+    .action((opts) => exitOnFailure(init({ force: Boolean(opts.force), dryRun: Boolean(opts.dryRun), only: opts.only })));
 }
 
 // Exported for the tests and for later scaffolds that extend the plan.
