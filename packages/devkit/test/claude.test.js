@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -54,6 +54,7 @@ test('claudeMdPath prefers an existing .claude/CLAUDE.md, then root CLAUDE.md, e
 test('installClaude writes the layer once and is a no-op afterwards; stubs are never overwritten', async () => {
   const root = mkdtempSync(join(tmpdir(), 'devkit-claude-install-'));
   cpSync(fixture, root, { recursive: true });
+  mkdirSync(join(root, '.git'));
   mkdirSync(join(root, '.claude'));
   writeFileSync(join(root, '.claude/CLAUDE.md'), '# Shop\n\nProject rules.\n');
   const first = await installClaude({ cwd: root, log: quiet });
@@ -69,4 +70,16 @@ test('installClaude writes the layer once and is a no-op afterwards; stubs are n
   writeFileSync(join(root, '.claude/agents/commit-writer.md'), 'edited\n');
   const third = await installClaude({ cwd: root, log: quiet });
   assert.deepEqual(third.skipped, ['.claude/agents/commit-writer.md']);
+});
+
+test('installClaude skips inside container builds (no .git or HUSKY=0) without writing', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'devkit-claude-skip-'));
+  cpSync(fixture, root, { recursive: true });
+  const logs = [];
+  assert.equal(await installClaude({ cwd: root, env: {}, log: (l) => logs.push(l) }), null);
+  assert.ok(!existsSync(join(root, '.claude')), 'nothing written without a checkout');
+  assert.match(logs.at(-1), /no git checkout here/);
+  mkdirSync(join(root, '.git'));
+  assert.equal(await installClaude({ cwd: root, env: { HUSKY: '0' }, log: (l) => logs.push(l) }), null);
+  assert.ok(!existsSync(join(root, '.claude')));
 });

@@ -303,8 +303,10 @@ export function pruneImages(ctx) {
     .filter(Boolean);
   const targets = unreferencedImages(stack.listImages(), { repos: ownedImageRepos(ctx.compose), referencedTags, inUse: stack.imagesInUse() });
   for (const img of targets) {
+    // Two checkouts pruning at once race for the same tag: whoever finds it gone stays quiet.
+    if (!stack.imageExists(img)) continue;
     if (stack.removeImage(img)) ctx.log(`removed unreferenced dev image ${img}`);
-    else ctx.note(`could not remove unreferenced dev image ${img}`);
+    else if (stack.imageExists(img)) ctx.note(`could not remove unreferenced dev image ${img}`);
   }
 }
 

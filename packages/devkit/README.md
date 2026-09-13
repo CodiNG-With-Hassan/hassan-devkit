@@ -1,6 +1,8 @@
 # @coding-with-hassan/devkit
 
-CLI that wraps the developer workflow shared across Hassan's client projects: docker compose orchestration, postgres helpers, and the husky pre-commit hook.
+The way of working of Hassan's client projects as one versioned package: parallel git worktrees with isolated Docker stacks, the pre-commit chain, a CI job with commit standards and an Nx cache, the Claude Code standards/agents/hooks, and the bilingual acceptance-test workbooks. A project installs it, fills one config block in `package.json`, runs `hassan-devkit init`, and picks up every later standard by bumping the version. Design: `docs/design/way-of-working.md`; decisions: `docs/adr/`.
+
+New projects start from [hassan-devkit-template](https://github.com/CodiNG-With-Hassan/hassan-devkit-template), which is exactly what `init` produces on an Nx `apps/*` + `libs/*` pnpm workspace.
 
 ## Install
 
@@ -38,7 +40,7 @@ Optionally add a `docker.preUp` hook — a shell command `docker:up` runs from t
 }
 ```
 
-## Wire it into your scripts
+## Wire it into your scripts (flat repos; Nx workspaces get this from `init`)
 
 ```json
 {
@@ -53,9 +55,9 @@ Optionally add a `docker.preUp` hook — a shell command `docker:up` runs from t
 }
 ```
 
-## The way of working (1.0 line)
+## The way of working
 
-From 1.0 the CLI is the single delivery vehicle for the whole way of working — parallel worktrees with isolated stacks, the pre-commit chain, CI with commit standards, and the Claude Code layer. Design: `docs/design/way-of-working.md` and ADR 0001 in this repo. New features assume an **Nx `apps/*` + `libs/*` pnpm monorepo**; the `docker:*`, `db:*` and `hooks:*` commands above stay layout-agnostic.
+Everything below assumes an **Nx `apps/*` + `libs/*` pnpm monorepo** (the template's shape); the `docker:*`, `db:*`, `i18n:check` and `hooks:*` commands further down stay layout-agnostic for the older flat repos. Requires Node ≥ 22.13.
 
 ### Configure once, derive the rest
 
@@ -168,7 +170,18 @@ import { tc, type Area, type KnownIssue, type Readme } from '@coding-with-hassan
 
 `hassan-devkit test-cases:generate [--lang xx] [--testers file.json]` writes `test-cases-<suite>-<lang>.xlsx` per suite and language (`testCases.languages`, default `en`, `nl`; workbook UI strings ship for those two) next to the data, plus a personalised copy per tester (Tester column prefilled, credentials in the Read Me sheet). Each workbook has a Read Me, a Summary with per-area counts, one sheet per area with a Pass/Fail/Blocked/Skipped dropdown, and a Known Issues sheet. The workbooks are gitignored artifacts; commit the data files with the feature. The data files are TypeScript loaded through Node's built-in type stripping (Node ≥ 22.13, no `tsx`), which keeps import specifiers verbatim — hence the `type` modifiers above. `testCases.title` sets the project name in the Read Me title. `init` scaffolds a starter `tc-data-app.ts` when the section is configured and the directory is empty.
 
-## Commands
+## Upgrading from 0.x
+
+- **Node ≥ 22.13** (the acceptance-case generator loads TypeScript data with Node's type stripping).
+- **Config block**: `hassan-devkit.db`, `docker.preUp` and `i18n` keep working; add `worktree`, `tracker`, `commits`, `ci`, `testCases` as needed — `hassan-devkit init --only config` writes the skeleton. Unknown keys are now rejected (`config:check`).
+- **`hooks:install`** no longer runs `husky init` (which rewrote your `prepare` script); it (re)creates husky's per-checkout shims and skips inside container builds (`HUSKY=0`, no `.git`). The hook body gained the `ci:doctor` step for staged workflow files; `i18n:check` stays.
+- **lint-staged**: replace `@coding-with-hassan/lint-staged-config` with `lint-staged.config.mjs` importing `@coding-with-hassan/devkit/lint-staged` (targets derived from the workspace; `init --only hooks` scaffolds it).
+- **`docker:up`** runs `worktree:env` implicitly once `hassan-devkit.worktree` names ports or profiles; a `docker.preUp` hook that only refreshed `.env` can go. Managed `.env` keys are `DEVKIT_SLOT`, `DEVKIT_IMAGE_TAG`, `DEVKIT_BRANCH`, `DEVKIT_PORT_*` — rename them in your compose file.
+- **CI**: `init --only ci --force` writes the thin workflow; delete hand-rolled affected/cache scripts. Commit scopes are derived from the workspace (`commits:show`).
+- **Claude**: `init --only claude,agents` adds the standards import, the stubs, the PR-assignee hook and regenerates `docs/agents`; trim your `CLAUDE.md` to project specifics.
+- Adopt piece by piece with `init --only <part>`; `ci:doctor` reports what is not adopted yet.
+
+## Layout-agnostic commands
 
 ### Docker
 
