@@ -158,7 +158,15 @@ Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entri
 
 Project-specific rules stay in the project's own `CLAUDE.md` below the import. A devkit bump therefore changes what Claude does with nothing to re-commit.
 
-`test-cases:generate` lands in the next prerelease — see the design doc for its contract.
+### Acceptance test cases (`test-cases:generate`)
+
+The quality gate for application code is the bilingual acceptance-case set in `docs/testing/` (`testCases.dir`), not unit tests. Data files `tc-data-<suite>.ts` export `*_AREAS`, `*_KNOWN_ISSUES` and `*_README`; the shared vocabulary comes from the package:
+
+```ts
+import { tc, type Area, type KnownIssue, type Readme } from '@coding-with-hassan/devkit/test-cases';
+```
+
+`hassan-devkit test-cases:generate [--lang xx] [--testers file.json]` writes `test-cases-<suite>-<lang>.xlsx` per suite and language (`testCases.languages`, default `en`, `nl`; workbook UI strings ship for those two) next to the data, plus a personalised copy per tester (Tester column prefilled, credentials in the Read Me sheet). Each workbook has a Read Me, a Summary with per-area counts, one sheet per area with a Pass/Fail/Blocked/Skipped dropdown, and a Known Issues sheet. The workbooks are gitignored artifacts; commit the data files with the feature. The data files are TypeScript loaded through Node's built-in type stripping (Node ≥ 22.13, no `tsx`), which keeps import specifiers verbatim — hence the `type` modifiers above. `testCases.title` sets the project name in the Read Me title. `init` scaffolds a starter `tc-data-app.ts` when the section is configured and the directory is empty.
 
 ## Commands
 
