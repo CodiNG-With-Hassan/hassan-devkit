@@ -18,6 +18,7 @@
     "devkit-pre-commit",
     "devkit-robust-hooks-doctor",
     "devkit-test-cases",
+    "devkit-testers-path",
     "devkit-tracker",
     "devkit-worktree"
   ]
