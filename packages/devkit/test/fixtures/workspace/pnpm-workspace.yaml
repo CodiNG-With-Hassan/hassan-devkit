@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - libs/**
+  - "!libs/skip/**"
+
+minimumReleaseAgeExclude:
+  - foo@1.0.0
