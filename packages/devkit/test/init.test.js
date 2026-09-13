@@ -20,7 +20,7 @@ const quiet = () => {};
 test('init scaffolds the seam, merges scripts/config without clobbering, and writes the slot-0 block', async () => {
   const root = freshCopy();
   const summary = await init({ root, log: quiet });
-  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
+  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
   assert.deepEqual(summary.updated.sort(), ['.env.dist', 'package.json']);
   assert.match(readFileSync(join(root, 'docs/agents/issue-tracker.md'), 'utf8'), /Jira project \*\*ACM\*\*/);
   assert.deepEqual(summary.overwritten, []);
@@ -52,7 +52,7 @@ test('init is idempotent, keeps edited files, and --force overwrites them', asyn
   assert.deepEqual(second.created, []);
   assert.deepEqual(second.updated, []);
   assert.deepEqual(second.overwritten, []);
-  assert.deepEqual(second.unchanged.sort(), ['.env.dist', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'package.json', 'scripts/pre-commit-extra.sh']);
+  assert.deepEqual(second.unchanged.sort(), ['.env.dist', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
 
   writeFileSync(join(root, 'scripts/pre-commit-extra.sh'), '#!/bin/sh\nexit 1\n');
   const third = await init({ root, log: quiet });
@@ -95,6 +95,7 @@ test('init without a compose file or husky adds neither docker scripts, prepare 
   writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2));
   const summary = await init({ root, log: quiet });
   assert.ok(!summary.created.includes('scripts/pre-commit-extra.sh'));
+  assert.ok(!summary.created.includes('lint-staged.config.mjs'));
   const after = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(after.scripts), ['build']);
 });

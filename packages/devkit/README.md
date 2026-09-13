@@ -120,7 +120,26 @@ One worktree per ticket, each with its own Docker stack (own compose project, ho
 
 All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree. `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
 
-`ci:*`, the Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
+### Pre-commit chain
+
+`hassan-devkit hooks:install` (wired as the `prepare` script, so it runs on every `pnpm install` in every checkout) installs husky, (re)creates its per-checkout shim dir and writes the shared `.husky/pre-commit`:
+
+1. `scripts/pre-commit-extra.sh` — the project's own guards (optional; must exit 0)
+2. `hassan-devkit i18n:check` — flat projects' translation keys (no-op otherwise)
+3. `hassan-devkit ci:doctor` — only when `.github/workflows/ci.yml` is staged
+4. `lint-staged` — targets derived from the workspace:
+
+```js
+// lint-staged.config.mjs
+import lintStaged from '@coding-with-hassan/devkit/lint-staged';
+export default lintStaged({ exclude: ['api-client'], extra: { 'scripts/**/*.mjs': ['prettier --write'] } });
+```
+
+Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entries (api: `**/*.ts`; spa/lib: `src/**/*.{ts,html}` and `src/**/*.{scss,css,json}`). No project list to maintain.
+
+`hassan-devkit ci:doctor` fails when the installed devkit does not satisfy the declared range (stale `node_modules`), when the config block is invalid, or when the husky shims are missing.
+
+`ci:*` (commit standards, Nx cache, affected), the Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
 
 ## Commands
 
