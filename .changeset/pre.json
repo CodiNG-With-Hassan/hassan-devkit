@@ -11,7 +11,12 @@
     "@coding-with-hassan/renovate-config": "0.1.1"
   },
   "changesets": [
+    "devkit-ci",
+    "devkit-claude",
     "devkit-foundation",
+    "devkit-inert-skeleton",
+    "devkit-pre-commit",
+    "devkit-test-cases",
     "devkit-tracker",
     "devkit-worktree"
   ]
