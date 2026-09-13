@@ -27,9 +27,10 @@ import { sanitizeName } from './derive.js';
  *              | { "kind": "none" },
  *     "commits": { "types": [...], "extraScopes": [...], "requireSigned": true,
  *                  "exemptAuthors": ["renovate[bot]"], "docsUrl": "https://..." },
- *     "ci": { "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm ..." }],
+ *     "ci": { "nodeVersion": "24", "baseBranch": "main",
+ *             "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm ..." }],
  *             "affected": { "contentOnly": ["libs/i18n/src/**\/*.json"], "adopted": { "scripts/*.mjs": "daz-i18n" } } },
- *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"] },
+ *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"], "title": "My Project" },
  *     "db": { "service": "db", "user": "postgres", "name": "app" },
  *     "docker": { "preUp": "..." },
  *     "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] }
@@ -46,6 +47,8 @@ export const DEFAULT_EXTRA_SCOPES = ['docker', 'workspace', 'docs', 'deps'];
 export const DEFAULT_EXEMPT_AUTHORS = ['renovate[bot]'];
 export const DEFAULT_MAX_SLOT = 30;
 export const DEFAULT_GITHUB_PREFIX = 'GH';
+export const DEFAULT_NODE_VERSION = '24';
+export const DEFAULT_BASE_BRANCH = 'main';
 export const TRACKER_KINDS = ['jira', 'github', 'none'];
 
 const isString = (v) => typeof v === 'string';
@@ -150,6 +153,8 @@ export function validateConfig(raw) {
     if (!isPlainObject(ci)) errors.push(`${CONFIG_KEY}.ci: expected an object`);
     else {
       const p = `${CONFIG_KEY}.ci`;
+      expect(`${p}.nodeVersion`, ci.nodeVersion, (v) => (isNonEmptyString(v) && /^\d+(\.\d+)*$/.test(v)) || (isInteger(v) && v > 0), 'a Node major like "24"');
+      expect(`${p}.baseBranch`, ci.baseBranch, isNonEmptyString, 'a branch name');
       if (ci.checks !== undefined) {
         if (!Array.isArray(ci.checks)) errors.push(`${p}.checks: expected an array`);
         else {
@@ -187,6 +192,7 @@ export function validateConfig(raw) {
     else {
       expect(`${CONFIG_KEY}.testCases.dir`, tc.dir, isNonEmptyString, 'a directory path');
       expect(`${CONFIG_KEY}.testCases.languages`, tc.languages, (v) => isStringArray(v) && v.length > 0, 'a non-empty array of language codes');
+      expect(`${CONFIG_KEY}.testCases.title`, tc.title, isNonEmptyString, 'the project name shown in the workbook title');
     }
   }
 
@@ -261,6 +267,8 @@ export function resolveConfig(raw = {}, { rootName }) {
   };
 
   const ci = {
+    nodeVersion: String(raw.ci?.nodeVersion ?? DEFAULT_NODE_VERSION),
+    baseBranch: raw.ci?.baseBranch ?? DEFAULT_BASE_BRANCH,
     checks: (raw.ci?.checks ?? []).map((c) => ({ name: c.name, paths: [...c.paths], run: c.run })),
     affected: {
       contentOnly: [...(raw.ci?.affected?.contentOnly ?? [])],
@@ -269,7 +277,7 @@ export function resolveConfig(raw = {}, { rootName }) {
   };
 
   const tc = raw.testCases;
-  const testCases = tc === undefined ? null : { dir: tc.dir ?? 'docs/testing', languages: [...(tc.languages ?? ['en', 'nl'])] };
+  const testCases = tc === undefined ? null : { dir: tc.dir ?? 'docs/testing', languages: [...(tc.languages ?? ['en', 'nl'])], title: tc.title ?? null };
 
   const db = raw.db ? { service: raw.db.service, user: raw.db.user, name: raw.db.name } : null;
   const docker = { preUp: typeof raw.docker?.preUp === 'string' && raw.docker.preUp.trim() ? raw.docker.preUp.trim() : null };

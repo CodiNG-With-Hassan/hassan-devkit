@@ -1,0 +1,87 @@
+/**
+ * The thin CI workflow `init` scaffolds. Every decision lives in the `hassan-devkit ci:*`
+ * commands (so a devkit bump updates it); the skeleton below only sequences them, and
+ * `ci:doctor` fails when a project's copy drifts from this template.
+ */
+
+export const WORKFLOW_PATH = '.github/workflows/ci.yml';
+
+export function renderWorkflow({ nodeVersion, baseBranch = 'main', exemptAuthors = [] }) {
+  const skip = exemptAuthors.map((a) => `github.event.pull_request.user.login != '${a}'`).join(' && ');
+  return `# Scaffolded by hassan-devkit init — the steps only sequence \`hassan-devkit ci:*\`, whose
+# logic (commit standard, checks, affected targets, Nx cache) ships with the installed devkit
+# version. \`hassan-devkit ci:doctor\` fails when this file drifts from the devkit's template;
+# re-run \`hassan-devkit init --force\` to refresh it.
+name: CI
+
+on:
+  pull_request:
+    branches: [${baseBranch}]
+
+# PRs may come from forks: keep the token read-only and use no repo secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-standards:
+    name: Commit standards
+    runs-on: ubuntu-latest${skip ? `\n    if: ${skip}` : ''}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${nodeVersion}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate PR commits
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: pnpm exec hassan-devkit ci:commit-standards
+
+  ci:
+    name: Lint & build (affected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${nodeVersion}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Restore Nx task cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .nx-ci-cache
+          key: nx-cache-\${{ hashFiles('pnpm-lock.yaml') }}-\${{ github.run_id }}-\${{ github.run_attempt }}
+          restore-keys: nx-cache-\${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm exec hassan-devkit ci:cache attach
+      - uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: ${baseBranch}
+      - name: Doctor, formatting and path-triggered checks
+        run: pnpm exec hassan-devkit ci:check --base=$NX_BASE --head=$NX_HEAD
+      - name: Lint & build affected projects
+        run: pnpm exec hassan-devkit ci:affected --base=$NX_BASE --head=$NX_HEAD
+      - if: always()
+        run: pnpm exec hassan-devkit ci:cache detach
+      - name: Save Nx task cache
+        if: always() && hashFiles('.nx-ci-cache/index.db') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .nx-ci-cache
+          key: nx-cache-\${{ hashFiles('pnpm-lock.yaml') }}-\${{ github.run_id }}-\${{ github.run_attempt }}
+`;
+}

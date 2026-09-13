@@ -120,7 +120,53 @@ One worktree per ticket, each with its own Docker stack (own compose project, ho
 
 All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree. `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
 
-`ci:*`, the Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
+### Pre-commit chain
+
+`hassan-devkit hooks:install` (wired as the `prepare` script, so it runs on every `pnpm install` in every checkout) installs husky, (re)creates its per-checkout shim dir and writes the shared `.husky/pre-commit`:
+
+1. `scripts/pre-commit-extra.sh` — the project's own guards (optional; must exit 0)
+2. `hassan-devkit i18n:check` — flat projects' translation keys (no-op otherwise)
+3. `hassan-devkit ci:doctor` — only when `.github/workflows/ci.yml` is staged
+4. `lint-staged` — targets derived from the workspace:
+
+```js
+// lint-staged.config.mjs
+import lintStaged from '@coding-with-hassan/devkit/lint-staged';
+export default lintStaged({ exclude: ['api-client'], extra: { 'scripts/**/*.mjs': ['prettier --write'] } });
+```
+
+Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entries (api: `**/*.ts`; spa/lib: `src/**/*.{ts,html}` and `src/**/*.{scss,css,json}`). No project list to maintain.
+
+`hassan-devkit ci:doctor` fails when the installed devkit does not satisfy the declared range (stale `node_modules`), when the config block is invalid, or when the husky shims are missing.
+
+### CI (`ci:*`)
+
+`init` scaffolds a thin `.github/workflows/ci.yml` for Nx workspaces (Node from `ci.nodeVersion`, base branch `ci.baseBranch`, exempt authors from `commits.exemptAuthors`). The file only sequences these commands, so a devkit bump changes what CI does without touching it; `ci:doctor` fails when the file drifts from the installed template (`init --force` refreshes it).
+
+- `hassan-devkit ci:commit-standards [--repo o/r --pr n]` — every non-merge PR commit must match `hassan-devkit commits:show` and, with `commits.requireSigned`, be Verified on GitHub. PRs by `commits.exemptAuthors` skip the check. Needs `GH_TOKEN`.
+- `hassan-devkit ci:cache attach|detach` — move Nx's task cache between `.nx` and the cacheable `.nx-ci-cache` folder, re-homing the machine-id-named index so restored entries are actually hit.
+- `hassan-devkit ci:check [--base --head]` — `ci:doctor`, then `format:check` for the projects owning a changed file (content files included), then every `ci.checks[]` whose `paths` regex matches a changed file runs its `run` command.
+- `hassan-devkit ci:affected [--targets lint,build] [--base --head] [--with-content] [--dry-run]` — graph targets (`build`) for touched projects and dependents, own-files targets (`lint`, `format:check`) only for projects owning a changed file; files no target reads (docs, `ci.affected.contentOnly`) are dropped first; `ci.affected.adopted` maps files outside any project to the project whose target reads them.
+
+### Claude Code layer
+
+`hassan-devkit claude:install` (run by `prepare` and by `init`) wires the house standards into Claude Code without copying content:
+
+- one `@import` line in the project's `CLAUDE.md` (`.claude/CLAUDE.md` when it exists) pulling `node_modules/@coding-with-hassan/devkit/claude/standards.md` — Docker via scripts, worktrees, commit/push consent + commit-writer, tickets, the acceptance-case quality gate, lint/format/CI parity, domain docs. In-repo imports load at launch without an approval dialog;
+- `.claude/agents/commit-writer.md` and `.claude/skills/implement-ticket/SKILL.md` as **stubs** whose body says "read the shipped file and follow it" — the stub never changes, the content ships with the devkit version;
+- the PR-assignee `PreToolUse` deny hook merged idempotently into `.claude/settings.json`.
+
+Project-specific rules stay in the project's own `CLAUDE.md` below the import. A devkit bump therefore changes what Claude does with nothing to re-commit.
+
+### Acceptance test cases (`test-cases:generate`)
+
+The quality gate for application code is the bilingual acceptance-case set in `docs/testing/` (`testCases.dir`), not unit tests. Data files `tc-data-<suite>.ts` export `*_AREAS`, `*_KNOWN_ISSUES` and `*_README`; the shared vocabulary comes from the package:
+
+```ts
+import { tc, type Area, type KnownIssue, type Readme } from '@coding-with-hassan/devkit/test-cases';
+```
+
+`hassan-devkit test-cases:generate [--lang xx] [--testers file.json]` writes `test-cases-<suite>-<lang>.xlsx` per suite and language (`testCases.languages`, default `en`, `nl`; workbook UI strings ship for those two) next to the data, plus a personalised copy per tester (Tester column prefilled, credentials in the Read Me sheet). Each workbook has a Read Me, a Summary with per-area counts, one sheet per area with a Pass/Fail/Blocked/Skipped dropdown, and a Known Issues sheet. The workbooks are gitignored artifacts; commit the data files with the feature. The data files are TypeScript loaded through Node's built-in type stripping (Node ≥ 22.13, no `tsx`), which keeps import specifiers verbatim — hence the `type` modifiers above. `testCases.title` sets the project name in the Read Me title. `init` scaffolds a starter `tc-data-app.ts` when the section is configured and the directory is empty.
 
 ## Commands
 

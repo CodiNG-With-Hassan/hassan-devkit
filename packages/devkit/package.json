@@ -24,19 +24,33 @@
     "bin",
     "src",
     "hooks",
+    "claude",
+    "lint-staged.js",
+    "test-cases.js",
+    "test-cases.d.ts",
     "README.md"
   ],
   "dependencies": {
     "cac": "^6.7.14",
+    "exceljs": "^4.4.0",
     "yaml": "^2.9.1"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./lint-staged": "./lint-staged.js",
+    "./test-cases": {
+      "types": "./test-cases.d.ts",
+      "default": "./test-cases.js"
+    },
+    "./package.json": "./package.json"
   }
 }
