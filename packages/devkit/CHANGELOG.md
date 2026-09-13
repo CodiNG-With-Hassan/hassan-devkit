@@ -1,5 +1,11 @@
 # @coding-with-hassan/devkit
 
+## 1.0.0-next.3
+
+### Patch Changes
+
+- 3cc7e5c: `test-cases:generate --testers <file>` now accepts an absolute path (it was joined onto the working directory and failed with ENOENT); relative paths still resolve against the cwd.
+
 ## 1.0.0-next.2
 
 ### Patch Changes
