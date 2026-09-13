@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { generate, listDataFiles, loadSuites, pickSuiteExports, slugify, suiteKeyOf, workbookName } from '../src/core/test-cases/generate.js';
 import { tc, tcase } from '../test-cases.js';
+import { resolveTestersPath } from '../src/commands/test-cases.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/testing', import.meta.url));
 
@@ -49,4 +50,10 @@ test('generate writes one workbook per suite and language with the expected shee
   assert.equal(wb.getWorksheet('Winkelwagen').getCell('C3').value, 'Middel');
   assert.equal(wb.getWorksheet('Lees mij').getCell('A1').value, 'Shop — Acceptatietests');
   await assert.rejects(generate({ dir: fixture, languages: ['de'], project: 'Shop', log: () => {} }), /Unknown language "de"/);
+});
+
+test('--testers accepts relative and absolute paths', () => {
+  assert.equal(resolveTestersPath('/repo', 'testers.json'), '/repo/testers.json');
+  assert.equal(resolveTestersPath('/repo', './docs/testers.json'), '/repo/docs/testers.json');
+  assert.equal(resolveTestersPath('/repo', '/tmp/testers.json'), '/tmp/testers.json', 'absolute paths were glued onto the cwd before');
 });

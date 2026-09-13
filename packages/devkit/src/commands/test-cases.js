@@ -1,7 +1,12 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { requireConfig, requireSection } from '../core/config.js';
 import { generate } from '../core/test-cases/generate.js';
 import { exitOnFailure } from '../util/run.js';
+
+/** Pure: `--testers` accepts a path relative to the cwd or an absolute one. */
+export function resolveTestersPath(cwd, arg) {
+  return resolve(cwd, arg);
+}
 
 /**
  * `test-cases:generate` — the acceptance-case workbooks from `<testCases.dir>/tc-data-*.ts`.
@@ -23,7 +28,7 @@ export function registerTestCases(cli) {
             languages: tc.languages,
             project: tc.title ?? loaded.pkg.name ?? loaded.rootName,
             onlyLang: opts.lang ?? null,
-            testersFile: opts.testers ? join(process.cwd(), opts.testers) : null,
+            testersFile: opts.testers ? resolveTestersPath(process.cwd(), opts.testers) : null,
           });
         }),
       ),
