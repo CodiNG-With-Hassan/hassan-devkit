@@ -27,7 +27,8 @@ import { sanitizeName } from './derive.js';
  *              | { "kind": "none" },
  *     "commits": { "types": [...], "extraScopes": [...], "requireSigned": true,
  *                  "exemptAuthors": ["renovate[bot]"], "docsUrl": "https://..." },
- *     "ci": { "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm ..." }],
+ *     "ci": { "nodeVersion": "24", "baseBranch": "main",
+ *             "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm ..." }],
  *             "affected": { "contentOnly": ["libs/i18n/src/**\/*.json"], "adopted": { "scripts/*.mjs": "daz-i18n" } } },
  *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"] },
  *     "db": { "service": "db", "user": "postgres", "name": "app" },
@@ -46,6 +47,8 @@ export const DEFAULT_EXTRA_SCOPES = ['docker', 'workspace', 'docs', 'deps'];
 export const DEFAULT_EXEMPT_AUTHORS = ['renovate[bot]'];
 export const DEFAULT_MAX_SLOT = 30;
 export const DEFAULT_GITHUB_PREFIX = 'GH';
+export const DEFAULT_NODE_VERSION = '24';
+export const DEFAULT_BASE_BRANCH = 'main';
 export const TRACKER_KINDS = ['jira', 'github', 'none'];
 
 const isString = (v) => typeof v === 'string';
@@ -150,6 +153,8 @@ export function validateConfig(raw) {
     if (!isPlainObject(ci)) errors.push(`${CONFIG_KEY}.ci: expected an object`);
     else {
       const p = `${CONFIG_KEY}.ci`;
+      expect(`${p}.nodeVersion`, ci.nodeVersion, (v) => (isNonEmptyString(v) && /^\d+(\.\d+)*$/.test(v)) || (isInteger(v) && v > 0), 'a Node major like "24"');
+      expect(`${p}.baseBranch`, ci.baseBranch, isNonEmptyString, 'a branch name');
       if (ci.checks !== undefined) {
         if (!Array.isArray(ci.checks)) errors.push(`${p}.checks: expected an array`);
         else {
@@ -261,6 +266,8 @@ export function resolveConfig(raw = {}, { rootName }) {
   };
 
   const ci = {
+    nodeVersion: String(raw.ci?.nodeVersion ?? DEFAULT_NODE_VERSION),
+    baseBranch: raw.ci?.baseBranch ?? DEFAULT_BASE_BRANCH,
     checks: (raw.ci?.checks ?? []).map((c) => ({ name: c.name, paths: [...c.paths], run: c.run })),
     affected: {
       contentOnly: [...(raw.ci?.affected?.contentOnly ?? [])],
