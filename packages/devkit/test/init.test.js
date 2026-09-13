@@ -101,3 +101,18 @@ test('init without a compose file or husky adds neither docker scripts, prepare 
   const after = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   assert.deepEqual(after.scripts, { build: 'nx run-many -t build', prepare: 'hassan-devkit claude:install' });
 });
+
+test('init with testCases configured and no data scaffolds a loadable starter suite', async () => {
+  const root = freshCopy();
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  pkg['hassan-devkit'].testCases = { dir: 'docs/testing', languages: ['en', 'nl'] };
+  writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2));
+  const summary = await init({ root, log: quiet });
+  assert.ok(summary.created.includes('docs/testing/tc-data-app.ts'));
+  const starter = readFileSync(join(root, 'docs/testing/tc-data-app.ts'), 'utf8');
+  assert.match(starter, /import \{ tc, type Area, type KnownIssue, type Readme \} from '@coding-with-hassan\/devkit\/test-cases'/);
+  assert.match(starter, /export const APP_AREAS: Area\[\]/);
+  const again = await init({ root, log: quiet });
+  assert.ok(!again.created.includes('docs/testing/tc-data-app.ts') && !again.overwritten.includes('docs/testing/tc-data-app.ts'), 'existing data is left alone');
+  assert.equal(readFileSync(join(root, 'docs/testing/tc-data-app.ts'), 'utf8'), starter);
+});

@@ -30,7 +30,7 @@ import { sanitizeName } from './derive.js';
  *     "ci": { "nodeVersion": "24", "baseBranch": "main",
  *             "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm ..." }],
  *             "affected": { "contentOnly": ["libs/i18n/src/**\/*.json"], "adopted": { "scripts/*.mjs": "daz-i18n" } } },
- *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"] },
+ *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"], "title": "My Project" },
  *     "db": { "service": "db", "user": "postgres", "name": "app" },
  *     "docker": { "preUp": "..." },
  *     "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] }
@@ -192,6 +192,7 @@ export function validateConfig(raw) {
     else {
       expect(`${CONFIG_KEY}.testCases.dir`, tc.dir, isNonEmptyString, 'a directory path');
       expect(`${CONFIG_KEY}.testCases.languages`, tc.languages, (v) => isStringArray(v) && v.length > 0, 'a non-empty array of language codes');
+      expect(`${CONFIG_KEY}.testCases.title`, tc.title, isNonEmptyString, 'the project name shown in the workbook title');
     }
   }
 
@@ -276,7 +277,7 @@ export function resolveConfig(raw = {}, { rootName }) {
   };
 
   const tc = raw.testCases;
-  const testCases = tc === undefined ? null : { dir: tc.dir ?? 'docs/testing', languages: [...(tc.languages ?? ['en', 'nl'])] };
+  const testCases = tc === undefined ? null : { dir: tc.dir ?? 'docs/testing', languages: [...(tc.languages ?? ['en', 'nl'])], title: tc.title ?? null };
 
   const db = raw.db ? { service: raw.db.service, user: raw.db.user, name: raw.db.name } : null;
   const docker = { preUp: typeof raw.docker?.preUp === 'string' && raw.docker.preUp.trim() ? raw.docker.preUp.trim() : null };
