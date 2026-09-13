@@ -21,7 +21,7 @@ test('an absent block is valid and resolves to defaults with unconfigured sectio
   assert.deepEqual(c.commits.types, DEFAULT_COMMIT_TYPES);
   assert.deepEqual(c.commits.extraScopes, DEFAULT_EXTRA_SCOPES);
   assert.equal(c.commits.requireSigned, true);
-  assert.deepEqual(c.ci, { checks: [], affected: { contentOnly: [], adopted: {} } });
+  assert.deepEqual(c.ci, { nodeVersion: '24', baseBranch: 'main', checks: [], affected: { contentOnly: [], adopted: {} } });
 });
 
 test('worktree defaults derive from the root name', () => {
