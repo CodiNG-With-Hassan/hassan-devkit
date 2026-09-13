@@ -20,7 +20,8 @@ const quiet = () => {};
 test('init scaffolds the seam, merges scripts/config without clobbering, and writes the slot-0 block', async () => {
   const root = freshCopy();
   const summary = await init({ root, log: quiet });
-  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.github/workflows/ci.yml']);
+  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.github/workflows/ci.yml', '.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/settings.json']);
+  assert.match(readFileSync(join(root, '.claude/CLAUDE.md'), 'utf8'), /@\.\.\/node_modules\/@coding-with-hassan\/devkit\/claude\/standards\.md/);
   assert.match(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'), /hassan-devkit ci:affected/);
   assert.deepEqual(summary.updated.sort(), ['.env.dist', 'package.json']);
   assert.match(readFileSync(join(root, 'docs/agents/issue-tracker.md'), 'utf8'), /Jira project \*\*ACM\*\*/);
@@ -30,7 +31,7 @@ test('init scaffolds the seam, merges scripts/config without clobbering, and wri
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.name, '@acme/shop-monorepo');
   assert.equal(pkg.scripts.build, 'nx run-many -t build', 'existing scripts untouched');
-  assert.equal(pkg.scripts.prepare, 'hassan-devkit hooks:install');
+  assert.equal(pkg.scripts.prepare, 'hassan-devkit hooks:install && hassan-devkit claude:install');
   assert.equal(pkg['hassan-devkit'].tracker.project, 'ACM', 'declared config kept');
   assert.deepEqual(pkg['hassan-devkit'].ci, { checks: [] }, 'skeleton added only where missing');
   assert.deepEqual(pkg['hassan-devkit'].commits, {});
@@ -53,7 +54,7 @@ test('init is idempotent, keeps edited files, and --force overwrites them', asyn
   assert.deepEqual(second.created, []);
   assert.deepEqual(second.updated, []);
   assert.deepEqual(second.overwritten, []);
-  assert.deepEqual(second.unchanged.sort(), ['.env.dist', '.github/workflows/ci.yml', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
+  assert.deepEqual(second.unchanged.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', '.env.dist', '.github/workflows/ci.yml', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
 
   writeFileSync(join(root, 'scripts/pre-commit-extra.sh'), '#!/bin/sh\nexit 1\n');
   const third = await init({ root, log: quiet });
@@ -98,5 +99,5 @@ test('init without a compose file or husky adds neither docker scripts, prepare 
   assert.ok(!summary.created.includes('scripts/pre-commit-extra.sh'));
   assert.ok(!summary.created.includes('lint-staged.config.mjs'));
   const after = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  assert.deepEqual(Object.keys(after.scripts), ['build']);
+  assert.deepEqual(after.scripts, { build: 'nx run-many -t build', prepare: 'hassan-devkit claude:install' });
 });

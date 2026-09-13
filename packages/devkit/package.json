@@ -24,6 +24,7 @@
     "bin",
     "src",
     "hooks",
+    "claude",
     "lint-staged.js",
     "README.md"
   ],
