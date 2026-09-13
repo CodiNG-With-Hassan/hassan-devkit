@@ -47,9 +47,22 @@ export function declaredDevkitRange(pkg) {
   return pkg.devDependencies?.[DEVKIT_PACKAGE] ?? pkg.dependencies?.[DEVKIT_PACKAGE] ?? null;
 }
 
-/** Pure: the workflow drift check. Returns the diff lines (empty = in sync) or null when absent. */
+export const SCAFFOLD_MARKER = '# Scaffolded by hassan-devkit init';
+
+/** Pure: was this workflow written by `init` (as opposed to a hand-written one not yet adopted)? */
+export function isScaffoldedWorkflow(text) {
+  return typeof text === 'string' && text.includes(SCAFFOLD_MARKER);
+}
+
+/**
+ * Pure: the workflow drift check. Returns the diff lines (empty = in sync), `null` when the
+ * file is absent, or `'not-adopted'` for a hand-written workflow (no scaffold marker) — a
+ * repo adopting the way of working piece by piece is not drifting, it just has not taken
+ * the `ci` part yet.
+ */
 export function workflowDrift(current, config) {
   if (current === null) return null;
+  if (!isScaffoldedWorkflow(current)) return 'not-adopted';
   const expected = renderWorkflow({ nodeVersion: config.ci.nodeVersion, baseBranch: config.ci.baseBranch, exemptAuthors: config.commits.exemptAuthors });
   return current === expected ? [] : lineDiff(current, expected);
 }
@@ -69,7 +82,8 @@ export function doctor({ cwd = process.cwd(), log = console.log } = {}) {
   if (loaded.config) {
     const file = join(loaded.root, WORKFLOW_PATH);
     const drift = workflowDrift(existsSync(file) ? readFileSync(file, 'utf8') : null, loaded.config);
-    if (drift && drift.length) {
+    if (drift === 'not-adopted') log(`doctor: ${WORKFLOW_PATH} is hand-written (ci part not adopted yet) — \`hassan-devkit init --only ci --force\` replaces it with the devkit workflow`);
+    else if (drift && drift.length) {
       problems.push(`${WORKFLOW_PATH} differs from the devkit ${installed} template — run \`hassan-devkit init --force\` (diff below)`);
       for (const line of drift) log(`    ${line}`);
     }

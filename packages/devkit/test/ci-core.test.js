@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { classifyFiles, globToRegExp, groupPlan, planTargets } from '../src/core/ci/affected.js';
 import { checkCommits, fromGithubCommits } from '../src/core/ci/commit-standards.js';
 import { renderWorkflow } from '../src/core/ci/workflow.js';
-import { workflowDrift } from '../src/commands/ci.js';
+import { isScaffoldedWorkflow, workflowDrift } from '../src/commands/ci.js';
 import { resolveConfig } from '../src/core/config.js';
 
 const PATTERN = '^DAZ-[0-9]+ (feat|fix|chore)\\((api|web-admin|workspace)\\): [a-z]';
@@ -84,6 +84,8 @@ test('renderWorkflow + workflowDrift: template reflects config; drift is a line 
   assert.ok(!yml.includes('--ignore-scripts'));
   assert.deepEqual(workflowDrift(yml, config), []);
   assert.equal(workflowDrift(null, config), null);
+  assert.ok(isScaffoldedWorkflow(yml));
+  assert.equal(workflowDrift('name: CI\non: push\n', config), 'not-adopted', 'a hand-written workflow is not drift');
   const drift = workflowDrift(yml.replace('node-version: 26', 'node-version: 20'), config);
   assert.deepEqual(drift, ['-          node-version: 20', '+          node-version: 26']);
 });
