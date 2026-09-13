@@ -11,9 +11,9 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "echo 'no build step — packages ship plain JS/JSON'",
+    "build": "echo 'no build step \u2014 packages ship plain JS/JSON'",
     "lint": "echo 'no shared lint step yet'",
-    "test": "echo 'no tests yet'",
+    "test": "pnpm --filter @coding-with-hassan/devkit test",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
@@ -23,5 +23,26 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "hassan-devkit": {
+    "worktree": {
+      "ports": {},
+      "profiles": {
+        "default": [],
+        "required": []
+      },
+      "seeds": {
+        "scripts": []
+      },
+      "env": {}
+    },
+    "tracker": {
+      "kind": "github",
+      "prefix": "GH"
+    },
+    "commits": {},
+    "ci": {
+      "checks": []
+    }
   }
 }

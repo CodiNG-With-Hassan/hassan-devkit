@@ -27,12 +27,16 @@
     "README.md"
   ],
   "dependencies": {
-    "cac": "^6.7.14"
+    "cac": "^6.7.14",
+    "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=20"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   }
 }

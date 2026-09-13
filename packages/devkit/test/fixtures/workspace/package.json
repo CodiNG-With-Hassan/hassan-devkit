@@ -1,0 +1,41 @@
+{
+  "name": "@acme/shop-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "nx run-many -t build"
+  },
+  "hassan-devkit": {
+    "worktree": {
+      "ports": {
+        "api": 3000,
+        "db": 5432,
+        "minioConsole": 9001
+      },
+      "profiles": {
+        "default": [
+          "api"
+        ],
+        "required": [
+          "api"
+        ]
+      },
+      "seeds": {
+        "service": "backend",
+        "scripts": [
+          "seed:admin"
+        ]
+      },
+      "env": {
+        "API_PROXY_TARGET": "http://localhost:${DEVKIT_PORT_API}"
+      }
+    },
+    "tracker": {
+      "kind": "jira",
+      "project": "ACM",
+      "baseUrl": "https://acme.atlassian.net"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

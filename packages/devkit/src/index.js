@@ -3,10 +3,16 @@ import { registerDocker } from './commands/docker.js';
 import { registerDb } from './commands/db.js';
 import { registerHooks } from './commands/hooks.js';
 import { registerI18n } from './commands/i18n.js';
+import { registerInit } from './commands/init.js';
+import { registerConfig } from './commands/config.js';
+import { registerWorktree } from './commands/worktree.js';
 
 export function run(argv) {
   const cli = cac('hassan-devkit');
 
+  registerInit(cli);
+  registerConfig(cli);
+  registerWorktree(cli);
   registerDocker(cli);
   registerDb(cli);
   registerHooks(cli);

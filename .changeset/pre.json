@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@coding-with-hassan/devkit": "0.4.0",
+    "@coding-with-hassan/eslint-config-api": "0.1.0",
+    "@coding-with-hassan/eslint-config-spa": "0.3.0",
+    "@coding-with-hassan/lint-staged-config": "0.1.0",
+    "@coding-with-hassan/prettier-config-api": "0.1.0",
+    "@coding-with-hassan/prettier-config-spa": "0.1.0",
+    "@coding-with-hassan/renovate-config": "0.1.1"
+  },
+  "changesets": []
+}
