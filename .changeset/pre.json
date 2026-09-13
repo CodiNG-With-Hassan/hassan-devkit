@@ -16,6 +16,7 @@
     "devkit-foundation",
     "devkit-inert-skeleton",
     "devkit-pre-commit",
+    "devkit-robust-hooks-doctor",
     "devkit-test-cases",
     "devkit-tracker",
     "devkit-worktree"
