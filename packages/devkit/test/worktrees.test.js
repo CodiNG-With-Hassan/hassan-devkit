@@ -14,6 +14,7 @@ import {
   staleVolumes,
   unreferencedImages,
   validateSlot,
+  worktreeActive,
 } from '../src/core/worktrees.js';
 
 const compose = deriveProfiles({
@@ -109,4 +110,13 @@ test('dockerfilesFromCompose resolves build contexts relative to the checkout', 
   ]);
   const outside = deriveProfiles({ services: { x: { build: { context: '/elsewhere', dockerfile: 'Dockerfile' }, image: 'x:1' } } });
   assert.deepEqual(dockerfilesFromCompose(outside, '/repo'), [], 'files outside the checkout are not hash inputs');
+});
+
+test('worktreeActive: an empty skeleton is inert in a compose repo, active without a compose file', () => {
+  const skeleton = { ports: {}, profiles: { default: [], required: [] } };
+  assert.equal(worktreeActive(null, { hasStack: true }), false);
+  assert.equal(worktreeActive(skeleton, { hasStack: true }), false, "init's skeleton must not take over docker:up");
+  assert.equal(worktreeActive(skeleton, { hasStack: false }), true, 'no compose file → nothing to take over');
+  assert.equal(worktreeActive({ ...skeleton, ports: { api: 3000 } }, { hasStack: true }), true);
+  assert.equal(worktreeActive({ ...skeleton, profiles: { default: ['api'], required: [] } }, { hasStack: true }), true);
 });
