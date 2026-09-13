@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, loadConfig, resolveConfig } from '../core/config.js';
 import { managedValues, writeManagedBlock } from '../core/env-block.js';
 import { agentsDocs } from '../core/agents-docs.js';
+import { WORKFLOW_PATH, renderWorkflow } from '../core/ci/workflow.js';
 import { applyPlan, formatJson, mergeMissing, planFile } from '../core/scaffold.js';
 import { exitOnFailure } from '../util/run.js';
 
@@ -112,6 +113,12 @@ export function buildPlans(loaded, notes = []) {
   // The skills' tracker/label/domain adapters are a function of the tracker config: managed,
   // so a tracker change (or a devkit bump that rewords them) flows on the next init.
   for (const [path, content] of agentsDocs(effective.tracker)) plans.push(planFile(root, path, content, { managed: true }));
+  // The thin CI workflow: only for Nx workspaces (ci:affected / ci:cache need nx). Not
+  // managed — a project may have edited it, so drift is reported by ci:doctor and fixed
+  // with --force.
+  if (existsSync(join(root, 'nx.json'))) {
+    plans.push(planFile(root, WORKFLOW_PATH, renderWorkflow({ nodeVersion: effective.ci.nodeVersion, baseBranch: effective.ci.baseBranch, exemptAuthors: effective.commits.exemptAuthors })));
+  }
   return plans;
 }
 

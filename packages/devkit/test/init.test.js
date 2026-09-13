@@ -20,7 +20,8 @@ const quiet = () => {};
 test('init scaffolds the seam, merges scripts/config without clobbering, and writes the slot-0 block', async () => {
   const root = freshCopy();
   const summary = await init({ root, log: quiet });
-  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
+  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.github/workflows/ci.yml']);
+  assert.match(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'), /hassan-devkit ci:affected/);
   assert.deepEqual(summary.updated.sort(), ['.env.dist', 'package.json']);
   assert.match(readFileSync(join(root, 'docs/agents/issue-tracker.md'), 'utf8'), /Jira project \*\*ACM\*\*/);
   assert.deepEqual(summary.overwritten, []);
@@ -52,7 +53,7 @@ test('init is idempotent, keeps edited files, and --force overwrites them', asyn
   assert.deepEqual(second.created, []);
   assert.deepEqual(second.updated, []);
   assert.deepEqual(second.overwritten, []);
-  assert.deepEqual(second.unchanged.sort(), ['.env.dist', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
+  assert.deepEqual(second.unchanged.sort(), ['.env.dist', '.github/workflows/ci.yml', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
 
   writeFileSync(join(root, 'scripts/pre-commit-extra.sh'), '#!/bin/sh\nexit 1\n');
   const third = await init({ root, log: quiet });

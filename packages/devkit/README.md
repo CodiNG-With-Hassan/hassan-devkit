@@ -139,7 +139,16 @@ Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entri
 
 `hassan-devkit ci:doctor` fails when the installed devkit does not satisfy the declared range (stale `node_modules`), when the config block is invalid, or when the husky shims are missing.
 
-`ci:*` (commit standards, Nx cache, affected), the Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
+### CI (`ci:*`)
+
+`init` scaffolds a thin `.github/workflows/ci.yml` for Nx workspaces (Node from `ci.nodeVersion`, base branch `ci.baseBranch`, exempt authors from `commits.exemptAuthors`). The file only sequences these commands, so a devkit bump changes what CI does without touching it; `ci:doctor` fails when the file drifts from the installed template (`init --force` refreshes it).
+
+- `hassan-devkit ci:commit-standards [--repo o/r --pr n]` — every non-merge PR commit must match `hassan-devkit commits:show` and, with `commits.requireSigned`, be Verified on GitHub. PRs by `commits.exemptAuthors` skip the check. Needs `GH_TOKEN`.
+- `hassan-devkit ci:cache attach|detach` — move Nx's task cache between `.nx` and the cacheable `.nx-ci-cache` folder, re-homing the machine-id-named index so restored entries are actually hit.
+- `hassan-devkit ci:check [--base --head]` — `ci:doctor`, then `format:check` for the projects owning a changed file (content files included), then every `ci.checks[]` whose `paths` regex matches a changed file runs its `run` command.
+- `hassan-devkit ci:affected [--targets lint,build] [--base --head] [--with-content] [--dry-run]` — graph targets (`build`) for touched projects and dependents, own-files targets (`lint`, `format:check`) only for projects owning a changed file; files no target reads (docs, `ci.affected.contentOnly`) are dropped first; `ci.affected.adopted` maps files outside any project to the project whose target reads them.
+
+The Claude layer and `test-cases:generate` land in the following prereleases — see the design doc for their contracts.
 
 ## Commands
 
