@@ -10,5 +10,9 @@
     "@coding-with-hassan/prettier-config-spa": "0.1.0",
     "@coding-with-hassan/renovate-config": "0.1.1"
   },
-  "changesets": []
+  "changesets": [
+    "devkit-foundation",
+    "devkit-tracker",
+    "devkit-worktree"
+  ]
 }
