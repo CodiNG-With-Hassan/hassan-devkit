@@ -8,6 +8,7 @@ import { registerConfig } from './commands/config.js';
 import { registerWorktree } from './commands/worktree.js';
 import { registerCi } from './commands/ci.js';
 import { registerClaude } from './commands/claude.js';
+import { registerTestCases } from './commands/test-cases.js';
 
 export function run(argv) {
   const cli = cac('hassan-devkit');
@@ -17,6 +18,7 @@ export function run(argv) {
   registerWorktree(cli);
   registerCi(cli);
   registerClaude(cli);
+  registerTestCases(cli);
   registerDocker(cli);
   registerDb(cli);
   registerHooks(cli);
