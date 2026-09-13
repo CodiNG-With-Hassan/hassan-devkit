@@ -1,5 +1,41 @@
 # @coding-with-hassan/devkit
 
+## 1.0.0-next.1
+
+### Minor Changes
+
+- 1941426: `ci:*` — the CI job's logic as CLI commands, so the project's workflow only sequences them and a devkit bump updates what CI does:
+  - `ci:commit-standards`: every non-merge PR commit must match the derived commit standard (`commits:show`) and be Verified when `commits.requireSigned`; PRs by `commits.exemptAuthors` are exempt. Reads the PR from the Actions event (or `--repo/--pr`).
+  - `ci:cache attach|detach`: Node port of the Nx task-cache dance (re-homes the machine-id-named index so restored entries are hit).
+  - `ci:check`: `ci:doctor` → `format:check` for changed projects (content files included) → every `ci.checks[]` whose `paths` match a changed file.
+  - `ci:affected [--targets] [--with-content] [--dry-run]`: port of the affected wrapper — graph targets via `nx show projects --affected`, own-files targets by ownership, docs and `ci.affected.contentOnly` dropped, `ci.affected.adopted` honoured.
+  - `ci:doctor` also compares `.github/workflows/ci.yml` with the installed template and prints the diff.
+  - `init` scaffolds the thin workflow for Nx workspaces from `ci.nodeVersion` (default `24`), `ci.baseBranch` (default `main`) and `commits.exemptAuthors`.
+
+- a5d56cc: The Claude Code layer, delivered without copied content:
+  - `claude/standards.md` ships the house rules (Docker via scripts; one ticket = one worktree = one stack; never commit/push without the user's explicit ask in the current request, commit-writer before staging, signed commits, no AI attribution; PR assignee; ticket ownership; acceptance cases instead of unit tests; lint/format/CI parity and Nx input contract; domain docs). The project's `CLAUDE.md` gets one `@import` line pointing at it.
+  - `claude/agents/commit-writer.md` and `claude/skills/implement-ticket/SKILL.md` ship the bodies; the project holds stubs that read them at runtime. The commit-writer body takes the ticket token, types and scopes from `hassan-devkit commits:show` — no mirrored lists.
+  - `hassan-devkit claude:install` (idempotent; run by `prepare` and by `init`) writes the import line under the H1 of the existing `CLAUDE.md`, the stubs (never overwritten once edited) and merges the PR-assignee `PreToolUse` deny hook into `.claude/settings.json`.
+  - `init`'s `prepare` script becomes `hassan-devkit hooks:install && hassan-devkit claude:install` (husky repos) or `hassan-devkit claude:install` (others).
+
+- a3b0871: Pre-commit chain without a hand-kept project list:
+  - **`@coding-with-hassan/devkit/lint-staged`** (ESM): `export default lintStaged()` derives the lint-staged targets from the workspace — every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entries (api: `**/*.ts`; spa/lib: `src/**/*.{ts,html}` and `src/**/*.{scss,css,json}`, so committed native folders are never touched). `{ extra }` merges entries for files outside any project. Replaces the one-api-one-spa factory of `@coding-with-hassan/lint-staged-config` for Nx workspaces (that package stays for flat repos).
+  - **Hook body**: project seam → `i18n:check` → `ci:doctor` when `.github/workflows/ci.yml` is staged → `lint-staged`.
+  - **`hooks:install`** now also (re)creates husky's per-checkout shim dir when `.husky/_` is missing and fails loudly when the shims are still absent — git silently skips every hook otherwise. Runs from `prepare`, so every worktree install is covered.
+  - **`ci:doctor`** (first version): fails when the installed devkit does not satisfy the range declared in `package.json` (a stale `node_modules` silently loses features), when the config block is invalid, or when `.husky/_/pre-commit` is missing.
+  - `init` scaffolds `lint-staged.config.mjs` for husky repos and notes a legacy `lint-staged.config.js` that must be removed (lint-staged reads one config file).
+
+- 2eb8f7b: `test-cases:generate` — the bilingual acceptance-test workbooks as a CLI, ported from car-rental's `docs/testing/generate-test-cases.ts`:
+  - `@coding-with-hassan/devkit/test-cases` exports `tc` (positional en/nl case), `tcase` and the types (`Area`, `TestCase`, `KnownIssue`, `Readme`, …) so a project's `tc-data-*.ts` files import their vocabulary from the package.
+  - Suites are discovered as `<testCases.dir>/tc-data-<suite>.ts`; each exports `*_AREAS`, `*_KNOWN_ISSUES`, `*_README`. `--lang` restricts the languages (`testCases.languages`, default en + nl), `--testers file.json` adds personalised workbooks. Workbook UI strings ship for `en` and `nl`; `testCases.title` names the project in the Read Me.
+  - The TypeScript data files are loaded with Node's built-in type stripping through a small loader hook (no `tsx`); type names must be imported with the `type` modifier. **`engines.node` is now `>=22.13`.**
+  - `init` scaffolds a starter `tc-data-app.ts` when `testCases` is configured and the directory has no data yet.
+
+### Patch Changes
+
+- 1e4f82b: - **Inert worktree skeleton** (#22): the `worktree` block `init` merges into every package.json is empty until the project fills it in. In a repo with a compose file, that skeleton no longer counts as "worktree configured": `docker:up` does not run the implicit `worktree:env` (which would have managed `.env` next to the project's existing tooling and built a second image set), the `worktree:*` commands fail with an actionable message, and `.env.dist` is left alone. A repo without a compose file is active with `{}`, as before.
+  - **`init --only <parts>`** (#23): `config`, `env`, `hooks`, `agents`, `ci`, `claude`, `test-cases` — scaffold one piece at a time when adopting the way of working in an existing repo. Default stays "everything".
+
 ## 1.0.0-next.0
 
 ### Major Changes
