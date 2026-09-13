@@ -6,6 +6,7 @@ import { registerI18n } from './commands/i18n.js';
 import { registerInit } from './commands/init.js';
 import { registerConfig } from './commands/config.js';
 import { registerWorktree } from './commands/worktree.js';
+import { registerCi } from './commands/ci.js';
 
 export function run(argv) {
   const cli = cac('hassan-devkit');
@@ -13,6 +14,7 @@ export function run(argv) {
   registerInit(cli);
   registerConfig(cli);
   registerWorktree(cli);
+  registerCi(cli);
   registerDocker(cli);
   registerDb(cli);
   registerHooks(cli);

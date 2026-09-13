@@ -37,6 +37,15 @@ const SCRIPT_DEFAULTS = { ...DOCKER_SCRIPTS, ...HOOK_SCRIPTS };
 
 const usesHusky = (pkg) => Boolean(pkg.devDependencies?.husky || pkg.dependencies?.husky);
 
+const LINT_STAGED_CONFIG = `// Targets are derived from the workspace (every project with an ESLint/Prettier config).
+// Options: { exclude: ['api-client'] } to leave a project alone (e.g. generated code that must
+// stay as its generator wrote it), { extra: { 'scripts/**/*.mjs': ['prettier --write'] } } for
+// files outside any project.
+import lintStaged from '@coding-with-hassan/devkit/lint-staged';
+
+export default lintStaged();
+`;
+
 const PRE_COMMIT_EXTRA = `#!/bin/sh
 # Project-specific pre-commit guards. Invoked first by the shared hook that
 # @coding-with-hassan/devkit installs (\`hassan-devkit hooks:install\`); exit non-zero to
@@ -83,7 +92,7 @@ export function planEnvDist(root, config, rootName) {
   return planFile(root, ENV_DIST_FILE, content, { managed: true });
 }
 
-export function buildPlans(loaded) {
+export function buildPlans(loaded, notes = []) {
   const { root, rootName, pkg } = loaded;
   const plans = [];
   const { plan: pkgPlan, next } = planPackageJson(root, pkg);
@@ -93,7 +102,13 @@ export function buildPlans(loaded) {
   const effective = resolveConfig(next[CONFIG_KEY] ?? {}, { rootName });
   const envDist = planEnvDist(root, effective, rootName);
   if (envDist) plans.push(envDist);
-  if (usesHusky(pkg)) plans.push(planFile(root, 'scripts/pre-commit-extra.sh', PRE_COMMIT_EXTRA, { mode: 0o755 }));
+  if (usesHusky(pkg)) {
+    plans.push(planFile(root, 'scripts/pre-commit-extra.sh', PRE_COMMIT_EXTRA, { mode: 0o755 }));
+    // lint-staged only reads one config file; a legacy hand-written `.js` must go first.
+    const legacy = ['lint-staged.config.js', 'lint-staged.config.cjs', '.lintstagedrc', '.lintstagedrc.js', '.lintstagedrc.json'].find((f) => existsSync(join(root, f)));
+    if (legacy) notes.push(`${legacy} exists — lint-staged reads only one config; replace it with the scaffolded lint-staged.config.mjs (derived targets) or delete the new file`);
+    plans.push(planFile(root, 'lint-staged.config.mjs', LINT_STAGED_CONFIG));
+  }
   // The skills' tracker/label/domain adapters are a function of the tracker config: managed,
   // so a tracker change (or a devkit bump that rewords them) flows on the next init.
   for (const [path, content] of agentsDocs(effective.tracker)) plans.push(planFile(root, path, content, { managed: true }));
@@ -106,7 +121,9 @@ export async function init({ force = false, dryRun = false, cwd = process.cwd(),
     throw new Error(`Fix the "${CONFIG_KEY}" block first:\n  - ${loaded.errors.join('\n  - ')}`);
   }
   log(`hassan-devkit init → ${loaded.root}${dryRun ? '  (dry run)' : ''}`);
-  const summary = applyPlan(loaded.root, buildPlans(loaded), { force, dryRun, log });
+  const notes = [];
+  const summary = applyPlan(loaded.root, buildPlans(loaded, notes), { force, dryRun, log });
+  for (const n of notes) log(`  note: ${n}`);
   const next = [
     `Fill in "${CONFIG_KEY}" in package.json (ports, profiles, seeds, tracker) and re-run \`hassan-devkit init\` to refresh ${ENV_DIST_FILE}.`,
     'Check the result with `hassan-devkit config:show` and `hassan-devkit commits:show`.',
