@@ -4,7 +4,7 @@ import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, loadConfig, resolveConfig } fr
 import { managedValues, writeManagedBlock } from '../core/env-block.js';
 import { agentsDocs } from '../core/agents-docs.js';
 import { WORKFLOW_PATH, renderWorkflow } from '../core/ci/workflow.js';
-import { claudePlans } from '../core/claude.js';
+import { SKILLS_PACKAGE, SKILLS_PACKAGE_SPEC, claudePlans } from '../core/claude.js';
 import { listDataFiles } from '../core/test-cases/generate.js';
 import { worktreeActive } from '../core/worktrees.js';
 import { applyPlan, formatJson, mergeMissing, planFile } from '../core/scaffold.js';
@@ -85,9 +85,11 @@ export const APP_README: Readme = {
 `;
 
 /**
- * Plan the package.json changes: config skeleton + default scripts, only where missing.
- * Docker scripts only make sense with a compose file, the `prepare` hook installer only
- * with husky as a dependency — a repo without them (this devkit repo itself) gets neither.
+ * Plan the package.json changes: config skeleton, default scripts and the Claude skills
+ * dependency, only where missing. Docker scripts only make sense with a compose file, the
+ * `prepare` hook installer only with husky as a dependency — a repo without them (this devkit
+ * repo itself) gets neither. The skills dependency is a GitHub tarball pinned to an upstream
+ * release tag: Renovate bumps the tag, `claude:install` derives the stubs from whatever is installed.
  */
 export function planPackageJson(root, pkg) {
   const next = structuredClone(pkg);
@@ -97,6 +99,10 @@ export function planPackageJson(root, pkg) {
   next.scripts ??= {};
   const scripts = { ...(existsSync(join(root, COMPOSE_FILE)) ? DOCKER_SCRIPTS : {}), ...(usesHusky(pkg) ? HOOK_SCRIPTS : CLAUDE_ONLY_SCRIPTS) };
   added.push(...mergeMissing(next.scripts, scripts, 'scripts'));
+  if (!next.dependencies?.[SKILLS_PACKAGE]) {
+    next.devDependencies ??= {};
+    added.push(...mergeMissing(next.devDependencies, { [SKILLS_PACKAGE]: SKILLS_PACKAGE_SPEC }, 'devDependencies'));
+  }
   return { plan: planFile(root, 'package.json', formatJson(next), { managed: true }), added, next };
 }
 
@@ -127,12 +133,12 @@ export function planEnvDist(root, config, rootName) {
  * repo can adopt the way of working one piece at a time (config first, the Claude layer last).
  */
 export const INIT_PARTS = {
-  config: 'the hassan-devkit block and default scripts in package.json',
+  config: 'the hassan-devkit block, default scripts and the mattpocock-skills dependency in package.json',
   env: 'the slot-0 managed block in .env.dist',
   hooks: 'the pre-commit seam and lint-staged.config.mjs',
   agents: 'docs/agents/*.md rendered from the tracker config',
   ci: 'the thin .github/workflows/ci.yml',
-  claude: 'the CLAUDE.md import, agent/skill stubs and the PR-assignee hook',
+  claude: 'the CLAUDE.md import, the agent stub, the gitignored skill stubs and the PR-assignee hook',
   'test-cases': 'a starter docs/testing data file',
 };
 
@@ -192,6 +198,7 @@ export async function init({ force = false, dryRun = false, only, cwd = process.
   for (const n of notes) log(`  note: ${n}`);
   const next = [
     `Fill in "${CONFIG_KEY}" in package.json (ports, profiles, seeds, tracker) and re-run \`hassan-devkit init\` to refresh ${ENV_DIST_FILE}.`,
+    `Run \`pnpm install\` so the ${SKILLS_PACKAGE} dependency lands and \`prepare\` writes the skill stubs.`,
     'Check the result with `hassan-devkit config:show` and `hassan-devkit commits:show`.',
   ];
   log(`\nNext:\n  - ${next.join('\n  - ')}`);
