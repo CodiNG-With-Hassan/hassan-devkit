@@ -1,6 +1,6 @@
 {
   "name": "@coding-with-hassan/renovate-config",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Renovate preset for client repos consuming the hassan-devkit ecosystem.",
   "license": "MIT",
   "author": "Hassan Khousheish",
