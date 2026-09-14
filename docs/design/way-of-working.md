@@ -199,8 +199,9 @@ cache restore, `ci:cache attach`, `nrwl/nx-set-shas`, `ci:check`, `ci:affected`,
 
 ### `claude:install`
 
-Runs from `prepare`. Writes, only when missing: `.claude/agents/commit-writer.md`,
-`.claude/skills/implement-ticket/SKILL.md` (stubs, see below), merges the `gh pr create`
+Runs from `prepare`. Writes, only when missing, `.claude/agents/commit-writer.md`; regenerates
+on every run one `.claude/skills/<name>/SKILL.md` per skill (stubs, see below) plus the managed
+`.gitignore` block that keeps them out of git; merges the `gh pr create`
 assignee deny hook into `.claude/settings.json` (`PreToolUse` on `Bash`, idempotent by hook
 id), and regenerates `docs/agents/{issue-tracker,triage-labels,domain}.md` from the tracker
 config. Adds the `@node_modules/@coding-with-hassan/devkit/claude/standards.md` line to
@@ -233,6 +234,20 @@ contribution. Workbooks are written next to the data and stay gitignored.
   `node_modules/@coding-with-hassan/devkit/claude/agents/commit-writer.md` and follow it
   exactly; the ticket prefix, types and scopes come from `hassan-devkit commits:show`". The stub
   never changes; the content does.
+- **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
+  (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
+  shipped in the package (`implement-ticket`) and the mattpocock skills, which the PROJECT
+  installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
+  tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
+  installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
+  Consuming the skills as a Claude Code plugin was rejected: a plugin lives in each developer's
+  `~/.claude`, so it reaches neither a fresh clone nor pickers that only scan `.claude/skills`
+  (T3 Code); vendoring copies into the devkit was rejected because every upstream change would
+  need a devkit release. The stubs are derived on every install and gitignored through a managed
+  block, so a bump leaves nothing to commit; Renovate updates the tag (github-tags datasource)
+  and the shared preset automerges it. A project stub with the plugin's bare name wins the bare
+  slash command while the qualified plugin name still resolves to the plugin (verified against
+  the CLI).
 - **Hooks**: merged into `.claude/settings.json` (committed, team-wide), not `settings.local.json`.
 - **Adapters**: `docs/agents/*.md` are generated from config and carry a "generated" header.
 

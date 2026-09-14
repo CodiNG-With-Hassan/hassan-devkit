@@ -1,0 +1,11 @@
+{
+  "name": "mattpocock-skills",
+  "version": "9.9.9",
+  "skills": [
+    "./skills/engineering/tdd",
+    "./skills/engineering/implement",
+    "./skills/engineering/setup-matt-pocock-skills",
+    "./skills/engineering/to-spec",
+    "./skills/productivity/grilling"
+  ]
+}

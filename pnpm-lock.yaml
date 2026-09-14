@@ -14,6 +14,9 @@ importers:
       '@coding-with-hassan/devkit':
         specifier: workspace:*
         version: link:packages/devkit
+      mattpocock-skills:
+        specifier: github:mattpocock/skills#v1.2.3
+        version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
 
   packages/devkit:
     dependencies:
@@ -1696,6 +1699,10 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e:
+    resolution: {tarball: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e}
+    version: 1.2.3
 
   media-typer@1.1.0:
     resolution: {integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==}
@@ -4352,6 +4359,8 @@ snapshots:
       - supports-color
 
   math-intrinsics@1.1.0: {}
+
+  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e: {}
 
   media-typer@1.1.0: {}
 

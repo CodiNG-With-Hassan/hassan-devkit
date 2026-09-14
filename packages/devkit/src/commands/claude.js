@@ -1,15 +1,29 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../core/config.js';
-import { claudePlans } from '../core/claude.js';
+import { claudePlans, stubPath } from '../core/claude.js';
 import { applyPlan } from '../core/scaffold.js';
 import { exitOnFailure } from '../util/run.js';
 
 /**
  * `claude:install` — wire the Claude Code layer into this repo: the `@import` of the shipped
- * standards in CLAUDE.md, the agent/skill stubs and the PR-assignee hook. Idempotent; runs from
- * `prepare` so every checkout has it, and from `init`.
+ * standards in CLAUDE.md, the agent stub, one stub per skill (house + the project's
+ * `mattpocock-skills` dependency, gitignored through a managed block) and the PR-assignee hook.
+ * Idempotent; runs from `prepare` so every checkout has the stubs, and from `init`.
  */
+
+/** Stub paths git still tracks: they predate the gitignore block and must be untracked once. */
+function trackedStubs(root, plans) {
+  const stubs = plans.map((p) => p.path).filter((p) => p === stubPath(p.split('/')[2]));
+  if (stubs.length === 0) return [];
+  try {
+    const out = execFileSync('git', ['ls-files', '--', ...stubs], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    return out.split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
 export async function installClaude({ cwd = process.cwd(), env = process.env, log = console.log, dryRun = false } = {}) {
   const { root } = loadConfig({ cwd });
   // Like hooks:install, this runs from `prepare` inside container image builds too (no .git,
@@ -18,7 +32,12 @@ export async function installClaude({ cwd = process.cwd(), env = process.env, lo
     log('claude layer: no git checkout here (container build or export) — skipping');
     return null;
   }
-  const summary = applyPlan(root, claudePlans(root), { dryRun, log });
+  const notes = [];
+  const plans = claudePlans(root, { notes });
+  const summary = applyPlan(root, plans, { dryRun, log });
+  const tracked = trackedStubs(root, plans);
+  if (tracked.length) notes.push(`skill stubs are generated and gitignored now — untrack the committed ones once: git rm --cached ${tracked.join(' ')}`);
+  for (const n of notes) log(`  note: ${n}`);
   const touched = summary.created.length + summary.updated.length;
   log(touched ? `claude layer: ${touched} file(s) written` : 'claude layer: up to date');
   return summary;
@@ -26,7 +45,7 @@ export async function installClaude({ cwd = process.cwd(), env = process.env, lo
 
 export function registerClaude(cli) {
   cli
-    .command('claude:install', 'Wire the Claude Code layer (standards import, agent/skill stubs, PR-assignee hook) into this repo')
+    .command('claude:install', 'Wire the Claude Code layer (standards import, agent stub, skill stubs from the devkit + mattpocock-skills, PR-assignee hook) into this repo')
     .option('--dry-run', 'Show what would change without writing')
     .action((opts) => exitOnFailure(installClaude({ dryRun: Boolean(opts.dryRun) })));
 }

@@ -155,7 +155,8 @@ Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entri
 `hassan-devkit claude:install` (run by `prepare` and by `init`) wires the house standards into Claude Code without copying content:
 
 - one `@import` line in the project's `CLAUDE.md` (`.claude/CLAUDE.md` when it exists) pulling `node_modules/@coding-with-hassan/devkit/claude/standards.md` — Docker via scripts, worktrees, commit/push consent + commit-writer, tickets, the acceptance-case quality gate, lint/format/CI parity, domain docs. In-repo imports load at launch without an approval dialog;
-- `.claude/agents/commit-writer.md` and `.claude/skills/implement-ticket/SKILL.md` as **stubs** whose body says "read the shipped file and follow it" — the stub never changes, the content ships with the devkit version;
+- `.claude/agents/commit-writer.md` as a **stub** whose body says "read the shipped file and follow it" — the stub never changes, the content ships with the devkit version;
+- one `.claude/skills/<name>/SKILL.md` stub per skill, same pattern: the house `implement-ticket` (body shipped by the devkit) and every skill of the project's `mattpocock-skills` dependency — `init` adds `github:mattpocock/skills#v1.2.3` to `devDependencies`, a GitHub tarball pinned to an upstream release tag that pnpm integrity-locks — except `implement` and `setup-matt-pocock-skills`, which the house skill and `init` replace. The stub copies the skill's frontmatter verbatim (user-invocable-only skills stay user-only) and points at the body under `node_modules`. Stubs are derived on every install and **gitignored** through a managed block, so nothing is committed and a bump changes nothing in git; they are what makes the skills reach every clone and the skill pickers that only scan `.claude/skills` (T3 Code). Renovate bumps the tag (the shared preset automerges it), so an upstream skills release needs no devkit release;
 - the PR-assignee `PreToolUse` deny hook merged idempotently into `.claude/settings.json`.
 
 Project-specific rules stay in the project's own `CLAUDE.md` below the import. A devkit bump therefore changes what Claude does with nothing to re-commit.
@@ -179,6 +180,7 @@ import { tc, type Area, type KnownIssue, type Readme } from '@coding-with-hassan
 - **`docker:up`** runs `worktree:env` implicitly once `hassan-devkit.worktree` names ports or profiles; a `docker.preUp` hook that only refreshed `.env` can go. Managed `.env` keys are `DEVKIT_SLOT`, `DEVKIT_IMAGE_TAG`, `DEVKIT_BRANCH`, `DEVKIT_PORT_*` — rename them in your compose file.
 - **CI**: `init --only ci --force` writes the thin workflow; delete hand-rolled affected/cache scripts. Commit scopes are derived from the workspace (`commits:show`).
 - **Claude**: `init --only claude,agents` adds the standards import, the stubs, the PR-assignee hook and regenerates `docs/agents`; trim your `CLAUDE.md` to project specifics.
+- **Skills** (1.1): `init --only config` adds the `mattpocock-skills` devDependency; `pnpm install` then writes the skill stubs and the `.gitignore` block, and `claude:install` prints the one-off `git rm --cached` for the `implement-ticket` stub you committed under 1.0. With the plugin still enabled in `~/.claude`, a bare `/grilling` runs the project stub and `/mattpocock-skills:grilling` the plugin (same body).
 - Adopt piece by piece with `init --only <part>`; `ci:doctor` reports what is not adopted yet.
 
 ## Layout-agnostic commands
