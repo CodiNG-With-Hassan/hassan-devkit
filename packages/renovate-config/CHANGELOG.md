@@ -1,5 +1,11 @@
 # @coding-with-hassan/renovate-config
 
+## 0.2.0
+
+### Minor Changes
+
+- f9781d5: Automerge `mattpocock-skills` bumps (the Claude skills dependency pinned to a GitHub release tag) at any time, so an upstream skills release reaches every consuming project without a review click.
+
 ## 0.1.1
 
 ### Patch Changes
