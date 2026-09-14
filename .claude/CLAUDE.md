@@ -14,5 +14,8 @@ own `devkit` as a `workspace:*` devDependency, so the standards above, the `work
 - `devkit` is plain Node ESM with `node --test` on pure logic only (`pnpm test`); no build step.
 - Every user-visible change ships a `.changeset/*.md`; the shipped Claude content under
   `packages/devkit/claude/` must never name a client project (a test enforces it).
+- The mattpocock skills are not vendored: they are the root `mattpocock-skills` devDependency
+  (pinned upstream release tag, Renovate bumps it) and `claude:install` derives the gitignored
+  stubs under `.claude/skills/` from the installed package on every `pnpm install`.
 - Issues are GitHub issues of this repo (`GH-<n>` branches and commit subjects); see
   `docs/agents/issue-tracker.md`.
