@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { applyPlan, lineDiff, mergeMissing, planFile, upsertTrailingBlock } from '../src/core/scaffold.js';
+import { applyPlan, lineDiff, mergeMissing, planFile, upsertTrailingBlock, upsertMarkedBlock } from '../src/core/scaffold.js';
 
 test('mergeMissing adds only absent keys, recursively, and reports paths', () => {
   const target = { a: 1, nested: { keep: 'x' }, scripts: { prepare: 'mine' } };
@@ -51,4 +51,14 @@ test('planFile + applyPlan: create, unchanged, differs-kept, differs-forced (wit
 
   summary = applyPlan(root, plans, { force: true, log });
   assert.equal(readFileSync(join(root, 'scripts/x.sh'), 'utf8'), 'echo one\n');
+});
+
+test('upsertMarkedBlock appends once, replaces in place, and keeps text after the block', () => {
+  const first = upsertMarkedBlock('node_modules/\n', '# >>> x', '# <<< x', ['a/', 'b/']);
+  assert.equal(first, 'node_modules/\n\n# >>> x\na/\nb/\n# <<< x\n');
+  const edited = `${first}\n# mine\ncoverage/\n`;
+  const second = upsertMarkedBlock(edited, '# >>> x', '# <<< x', ['b/', 'c/']);
+  assert.equal(second, 'node_modules/\n\n# >>> x\nb/\nc/\n# <<< x\n\n# mine\ncoverage/\n');
+  assert.equal(upsertMarkedBlock(second, '# >>> x', '# <<< x', ['b/', 'c/']), second, 'idempotent');
+  assert.equal(upsertMarkedBlock('', '# >>> x', '# <<< x', []), '# >>> x\n# <<< x\n');
 });

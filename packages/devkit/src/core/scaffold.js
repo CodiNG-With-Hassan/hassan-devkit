@@ -36,6 +36,21 @@ export function upsertTrailingBlock(text, markerPrefix, block) {
   return `${head ? `${head}\n\n` : ''}${block.replace(/\s+$/, '')}\n`;
 }
 
+/**
+ * Replace the lines between `begin` and `end` (both exact lines, kept) with `bodyLines`;
+ * append the whole block at the end when the markers are absent. Unlike the trailing block,
+ * text after the block survives — for files the project also edits by hand (`.gitignore`).
+ */
+export function upsertMarkedBlock(text, begin, end, bodyLines) {
+  const block = [begin, ...bodyLines, end];
+  const lines = (text ?? '').split('\n');
+  const from = lines.indexOf(begin);
+  const to = lines.indexOf(end, from + 1);
+  if (from !== -1 && to !== -1) return [...lines.slice(0, from), ...block, ...lines.slice(to + 1)].join('\n');
+  const head = (text ?? '').replace(/\s+$/, '');
+  return `${head ? `${head}\n\n` : ''}${block.join('\n')}\n`;
+}
+
 /** Minimal line diff (LCS) rendered as unified-ish `-`/`+` lines. */
 export function lineDiff(before, after) {
   const a = before.split('\n');
