@@ -18,6 +18,12 @@
       "schedule": ["at any time"]
     },
     {
+      "description": "The Claude skills dependency (GitHub release tag): automerge so an upstream release reaches every project unattended.",
+      "matchPackageNames": ["mattpocock-skills"],
+      "schedule": ["at any time"],
+      "automerge": true
+    },
+    {
       "description": "Group Angular framework packages.",
       "matchPackageNames": ["/^@angular//", "/^@angular-eslint//", "angular-eslint"],
       "groupName": "angular"
