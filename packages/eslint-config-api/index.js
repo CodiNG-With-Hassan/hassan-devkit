@@ -29,6 +29,10 @@ export default function defineApiConfig({ tsconfigRootDir, extra = [] }) {
     },
     {
       rules: {
+        // Debug output must not ship: console.log fails lint. Nest's Logger is
+        // the tool for an API; warn/error stay allowed for parity with the SPA
+        // preset (bootstrap catches outside the Nest context).
+        'no-console': ['error', { allow: ['warn', 'error'] }],
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-floating-promises': 'warn',
         '@typescript-eslint/no-unsafe-argument': 'warn',
