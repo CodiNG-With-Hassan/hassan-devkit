@@ -1,5 +1,12 @@
 # @coding-with-hassan/devkit
 
+## 1.2.0
+
+### Minor Changes
+
+- e479a87: `ci:affected` / `ci:check`: a file matching a `ci.affected.adopted` glob is never dropped by the built-in docs filter or by `contentOnly` — it is read by the mapped project's target, so it selects that project. Previously an entry such as `"docs/testing/*.ts": "daz-i18n"` was dead config because `docs/` was filtered first, and a consumer needed a path-triggered `ci.checks` gate to run `format:check` for acceptance-case data.
+- a562067: The shared pre-commit hook aborts the commit when lint-staged rewrote staged files: the staged tree (`git write-tree`) is compared before and after `lint-staged`, the fixers are re-run until the tree is stable (they cascade — Prettier reformats what `eslint --fix` produced only on the next run), and a changed tree exits 1 listing the rewritten files, which stay applied and staged. Review, rebuild, then run the same `git commit` again — the second attempt passes; clean commits pass in one go with no extra output. Why: an `eslint --fix` such as `type` → `interface` used to slip into the commit and fail CI's production build while the local build had been green. Consumers pick it up on `pnpm install` (`hooks:install` rewrites `.husky/pre-commit`).
+
 ## 1.1.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @coding-with-hassan/eslint-config-spa
 
+## 0.4.0
+
+### Minor Changes
+
+- 61a340d: `no-console` is now an error (`console.warn` / `console.error` allowed): debug `console.log` calls fail lint instead of shipping. A single legitimate line — an SSR startup log — takes `// eslint-disable-next-line no-console -- <reason>`; a project that must relax the rule overrides it in `extra`.
+
 ## 0.3.0
 
 ### Minor Changes
