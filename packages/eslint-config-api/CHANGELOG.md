@@ -1,5 +1,11 @@
 # @coding-with-hassan/eslint-config-api
 
+## 0.2.0
+
+### Minor Changes
+
+- faf43af: `no-console` is now an error (`console.warn` / `console.error` allowed): log through Nest's `Logger`. A project that must relax the rule overrides it in `extra`.
+
 ## 0.1.0
 
 ### Minor Changes
