@@ -15,5 +15,36 @@ if git diff --cached --name-only | grep -q '^\.github/workflows/ci\.yml$'; then
   pnpm exec hassan-devkit ci:doctor || exit 1
 fi
 
-# 4. Per-project lint/format on staged files (targets derived from the workspace)
-pnpm exec lint-staged
+# 4. Per-project lint/format on staged files (targets derived from the workspace). The hook
+#    never rewrites silently (README → "Pre-commit chain"): the staged tree (`git write-tree`)
+#    is compared before and after lint-staged; fixers cascade, so lint-staged is re-run until
+#    the tree is stable, then a changed tree aborts the commit with the rewritten files listed.
+max_reruns=3
+before=$(git write-tree) || exit 1
+previous=$before
+reruns=0
+failed=0
+stable=1
+while :; do
+  pnpm exec lint-staged || failed=1
+  after=$(git write-tree) || exit 1
+  [ "$failed" -eq 1 ] && break
+  [ "$after" = "$previous" ] && break
+  if [ "$reruns" -ge "$max_reruns" ]; then stable=0; break; fi
+  previous=$after
+  reruns=$((reruns + 1))
+done
+if [ "$before" != "$after" ]; then
+  {
+    echo ""
+    echo "pre-commit: lint-staged rewrote staged files — the fixes are applied and staged, but the commit is aborted:"
+    git diff --name-only "$before" "$after" | sed 's/^/  /'
+    if [ "$stable" -eq 1 ]; then
+      echo "Review them (git diff --cached), rebuild what they touch, then run the same git commit again."
+    else
+      echo "The fixers were still changing these files after $max_reruns re-runs (conflicting prettier/eslint rules?) — review them (git diff --cached), then run the same git commit again."
+    fi
+  } >&2
+  exit 1
+fi
+exit "$failed"
