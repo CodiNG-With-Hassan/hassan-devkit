@@ -41,7 +41,7 @@ project picks it up by bumping the package version. Nothing else.
 | 14 | Package work = GitHub issues here, worked in worktrees with the `github` adapter. car-rental migration = one DAZ epic. |
 | 15 | GitHub ticket token `GH-<n>` in branches and commit subjects; `Closes #<n>` in the PR body. |
 | 16 | The worktree code is ported from bash to Node ESM. |
-| 17 | `node --test` on pure logic only (derivation, env block, regex, slot math). No tests around docker/git/gh. |
+| 17 | `node --test` on pure logic (derivation, env block, regex, slot math). No tests around docker/gh; the shipped pre-commit hook is the one script run for real — in a throwaway git repo with a stub `pnpm` (amended with GH-40). |
 | 18 | GitHub adapter on `worktree:create`: assign `@me` only. |
 
 ## Package shape
@@ -210,7 +210,7 @@ config. Adds the `@node_modules/@coding-with-hassan/devkit/claude/standards.md` 
 ### `hooks:install` (changed)
 
 The shipped `pre-commit.sh` becomes: `scripts/pre-commit-extra.sh` if present → `ci:doctor`
-if the workflow is staged → `lint-staged`. The `i18n:check` line is dropped (it was a no-op in
+if the workflow is staged → `lint-staged`, which never rewrites silently: the staged tree is compared before and after (fixers re-run until stable) and a changed tree aborts the commit listing the rewritten files (GH-40). The `i18n:check` line is dropped (it was a no-op in
 the monorepo and is superseded by the project's own `check-translations` targets); the
 `i18n:check` command itself stays for flat projects. `lint-staged.config.js` becomes
 `module.exports = require('@coding-with-hassan/devkit/lint-staged')()` and derives its targets.

@@ -139,6 +139,8 @@ export default lintStaged({ exclude: ['api-client'], extra: { 'scripts/**/*.mjs'
 
 Every project with an ESLint/Prettier config gets `pnpm -C <dir> exec …` entries (api: `**/*.ts`; spa/lib: `src/**/*.{ts,html}` and `src/**/*.{scss,css,json}`). No project list to maintain.
 
+The hook never rewrites silently. lint-staged re-stages the fixes `eslint --fix` / `prettier --write` applied, so the hook snapshots the staged tree (`git write-tree`) before and after it runs: when the tree changed, the commit is **aborted** and the rewritten files are listed — the tree that gets committed and pushed must be one that was built and tested (an auto-fix such as `type` → `interface` can break a production build that was green locally). Fixers cascade (Prettier reformats what `eslint --fix` produced only on the next run), so lint-staged is re-run until the staged tree is stable (at most three extra passes) before the files are listed. The fixes stay staged: review them (`git diff --cached`), rebuild what they touch, then run the same `git commit` again — the second attempt on the unchanged tree passes. Clean commits pass in one go with no extra output.
+
 `hassan-devkit ci:doctor` fails when the installed devkit does not satisfy the declared range (stale `node_modules`), when the config block is invalid, or when the husky shims are missing.
 
 ### CI (`ci:*`)
