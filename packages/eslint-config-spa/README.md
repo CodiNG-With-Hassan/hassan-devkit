@@ -45,3 +45,7 @@ module.exports = require('@coding-with-hassan/eslint-config-spa')({
 - `angular-eslint` template-recommended + template-accessibility for `.html`
 - `eslint-config-prettier` to disable rules that conflict with Prettier
 - Customisable selector prefix for components and directives
+- `no-console` as an error, with `console.warn` / `console.error` allowed — debug `console.log`
+  calls never reach `main`. One legitimate line (an SSR startup log) takes
+  `// eslint-disable-next-line no-console -- <reason>`; a project that must relax the rule
+  overrides it in `extra`.

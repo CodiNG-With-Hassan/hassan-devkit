@@ -44,3 +44,5 @@ export default config({
 - `eslint-plugin-prettier` (errors on prettier violations, with `endOfLine: 'auto'`)
 - Node + Jest globals
 - Sensible relaxations for NestJS: `no-explicit-any` off; `no-floating-promises` and `no-unsafe-argument` at `warn`
+- `no-console` as an error, with `console.warn` / `console.error` allowed — log through Nest's
+  `Logger`; a project that must relax the rule overrides it in `extra`.

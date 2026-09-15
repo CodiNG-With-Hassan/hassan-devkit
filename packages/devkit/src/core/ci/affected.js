@@ -21,7 +21,9 @@ import { capture, run } from '../exec.js';
  *
  * Project-specific lists come from `ci.affected` in the config: `contentOnly` (globs of
  * files copied verbatim into outputs — skipped unless `--with-content`) and `adopted`
- * (glob → project that reads files outside every project root).
+ * (glob → project that reads files outside every project root). An adopted file is, by
+ * definition, read by a project target, so it is never dropped — not by the docs filter and
+ * not by `contentOnly` — even when it lives under `docs/` (acceptance-case data files, say).
  */
 
 export const DOCS_ONLY = [/\.md$/, /^docs\//];
@@ -53,9 +55,10 @@ export function classifyFiles(changed, { roots, contentOnly = [], adopted = {}, 
   const contentRes = contentOnly.map(globToRegExp);
   const adoptedRes = Object.entries(adopted).map(([glob, project]) => [globToRegExp(glob), project]);
   const ignore = withContent ? DOCS_ONLY : [...DOCS_ONLY, ...contentRes];
+  const isAdopted = (f) => adoptedRes.some(([re]) => re.test(f));
   const ignored = [];
   const files = [];
-  for (const f of changed) (ignore.some((re) => re.test(f)) ? ignored : files).push(f);
+  for (const f of changed) (!isAdopted(f) && ignore.some((re) => re.test(f)) ? ignored : files).push(f);
   const touched = new Set();
   const globals = [];
   const unowned = [];

@@ -42,6 +42,11 @@ module.exports = function defineSpaConfig(opts = {}) {
       },
       processor: angular.processInlineTemplates,
       rules: {
+        // Debug output must not ship: console.log fails lint. warn/error stay
+        // allowed for bootstrap catches and store/service failure logs; a single
+        // legitimate line (an SSR startup log) takes an
+        // `eslint-disable-next-line no-console -- reason`.
+        'no-console': ['error', { allow: ['warn', 'error'] }],
         '@angular-eslint/directive-selector': [
           'error',
           { type: 'attribute', prefix, style: 'camelCase' },

@@ -56,6 +56,17 @@ test('classifyFiles: ignores docs and content, owns by longest root, adopts, fla
   assert.ok(withContent.touched.has('daz-i18n'));
 });
 
+test('classifyFiles: an adopted file is never ignored, not by the docs filter nor by contentOnly', () => {
+  const roots = { 'daz-i18n': 'libs/i18n' };
+  const adopted = { 'docs/testing/*.ts': 'daz-i18n', 'libs/assets/src/icons/*.svg': 'daz-i18n' };
+  const changed = ['docs/testing/tc-data-web.ts', 'docs/testing/README.md', 'docs/adr/0001.md', 'libs/assets/src/icons/car.svg', 'libs/assets/src/images/hero.jpg'];
+  const c = classifyFiles(changed, { roots, contentOnly: ['libs/assets/src/**'], adopted });
+  assert.deepEqual(c.files, ['docs/testing/tc-data-web.ts', 'libs/assets/src/icons/car.svg']);
+  assert.deepEqual(c.ignored, ['docs/testing/README.md', 'docs/adr/0001.md', 'libs/assets/src/images/hero.jpg']);
+  assert.deepEqual([...c.touched], ['daz-i18n']);
+  assert.deepEqual(c.unowned, []);
+});
+
 test('planTargets + groupPlan: graph targets via nx, own-files targets by touched projects or all on globals', () => {
   const nx = {
     affectedFor: () => ['api', 'web-admin'],
