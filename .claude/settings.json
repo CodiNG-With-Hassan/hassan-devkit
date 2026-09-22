@@ -6,7 +6,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -c 'if (.tool_input.command // \"\" | test(\"gh pr create\")) and ((.tool_input.command // \"\" | test(\"--assignee|(^|\\\\s)-a(\\\\s|=)\")) | not) then {hookSpecificOutput:{hookEventName:\"PreToolUse\",permissionDecision:\"deny\",permissionDecisionReason:\"Team git workflow standard: every PR gets its author assigned at creation - re-run gh pr create with --assignee @me.\"}} else empty end'"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" && node node_modules/@coding-with-hassan/devkit/bin/cli.js claude:hook pre-bash"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" && node node_modules/@coding-with-hassan/devkit/bin/cli.js claude:hook post-edit",
+            "timeout": 30
           }
         ]
       }

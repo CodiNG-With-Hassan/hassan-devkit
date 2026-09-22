@@ -20,6 +20,7 @@ coverage/
 .claude/skills/handoff/
 .claude/skills/implement-ticket/
 .claude/skills/improve-codebase-architecture/
+.claude/skills/merge-upstream/
 .claude/skills/prototype/
 .claude/skills/research/
 .claude/skills/resolving-merge-conflicts/
