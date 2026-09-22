@@ -8,6 +8,7 @@ import { registerConfig } from './commands/config.js';
 import { registerWorktree } from './commands/worktree.js';
 import { registerCi } from './commands/ci.js';
 import { registerClaude } from './commands/claude.js';
+import { registerFormat } from './commands/format.js';
 import { registerTestCases } from './commands/test-cases.js';
 
 export function run(argv) {
@@ -18,6 +19,7 @@ export function run(argv) {
   registerWorktree(cli);
   registerCi(cli);
   registerClaude(cli);
+  registerFormat(cli);
   registerTestCases(cli);
   registerDocker(cli);
   registerDb(cli);
