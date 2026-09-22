@@ -2,12 +2,15 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatJson, planFile, upsertMarkedBlock } from './scaffold.js';
+import { mergeSettingsHooks } from './claude-hooks.js';
 
 /**
  * The Claude Code layer. Nothing here is copied content: the project's `CLAUDE.md` imports the
  * standards text from `node_modules` and the agent/skill files are stubs that read the shipped
  * body at runtime, so a devkit bump changes what Claude does without a re-commit. Only the
- * settings hook is merged into a committed file, and that merge is idempotent.
+ * settings hook entries are merged into a committed file, and that merge is idempotent
+ * (claude-hooks.js: two entries that run `hassan-devkit claude:hook <id>`, so the guards behind
+ * them change with the devkit version too).
  *
  * Skills come from two places and get the same treatment — one stub per skill, frontmatter
  * copied verbatim from the body file (name, description, invocation flags: what Claude Code and
@@ -57,29 +60,6 @@ Read \`${PACKAGE_DIR}/claude/agents/commit-writer.md\` (relative to the repo roo
 it exactly. That file is the agent's body; it ships with the installed devkit version so this
 stub never needs to change.
 `;
-
-/** The PreToolUse hook that denies `gh pr create` without an assignee (team PR standard). */
-export const PR_ASSIGNEE_HOOK = {
-  matcher: 'Bash',
-  hooks: [
-    {
-      type: 'command',
-      command:
-        'jq -c \'if (.tool_input.command // "" | test("gh pr create")) and ((.tool_input.command // "" | test("--assignee|(^|\\\\s)-a(\\\\s|=)")) | not) then {hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:"Team git workflow standard: every PR gets its author assigned at creation - re-run gh pr create with --assignee @me."}} else empty end\'',
-    },
-  ],
-};
-
-const isPrHook = (entry) => (entry?.hooks ?? []).some((h) => typeof h.command === 'string' && h.command.includes('gh pr create') && h.command.includes('--assignee'));
-
-/** Pure: merge the PR hook into a settings object (adds once; existing entry left alone). */
-export function mergeSettingsHook(settings) {
-  const next = structuredClone(settings ?? {});
-  next.hooks ??= {};
-  next.hooks.PreToolUse ??= [];
-  if (!next.hooks.PreToolUse.some(isPrHook)) next.hooks.PreToolUse.push(structuredClone(PR_ASSIGNEE_HOOK));
-  return next;
-}
 
 /**
  * Pure: the CLAUDE.md text with the import line. Imports resolve relative to the file that
@@ -204,7 +184,7 @@ export function claudePlans(root, { notes = [] } = {}) {
       throw new Error(`.claude/settings.json is not valid JSON: ${e.message}`);
     }
   }
-  plans.push(planFile(root, '.claude/settings.json', formatJson(mergeSettingsHook(settings)), { managed: true }));
+  plans.push(planFile(root, '.claude/settings.json', formatJson(mergeSettingsHooks(settings)), { managed: true }));
   return plans;
 }
 

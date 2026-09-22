@@ -14,7 +14,6 @@ import {
   allSkills,
   claudeMdPath,
   houseSkills,
-  mergeSettingsHook,
   packageSkills,
   skillStub,
   withSkillStubsIgnored,
@@ -48,12 +47,18 @@ test('the shipped Claude content names no project', () => {
     assert.ok(standards.includes(rule), `standards.md lacks "${rule}"`);
   }
   assert.doesNotMatch(readFileSync(join(pkgRoot, 'claude/skills/implement-ticket/SKILL.md'), 'utf8'), /^Commit your work/m);
+  const merge = readFileSync(join(pkgRoot, 'claude/skills/merge-upstream/SKILL.md'), 'utf8');
+  assert.match(merge, /^disable-model-invocation: true$/m, 'creates a merge commit: user-invocable only');
+  for (const step of ['--ff-only', 'pnpm install --frozen-lockfile', 'git checkout <remote>/<base> -- <file>', 'Do not push']) assert.ok(merge.includes(step), `merge-upstream lacks "${step}"`);
 });
 
 test('houseSkills: the skills shipped by the package, with frontmatter naming their folder', () => {
   const skills = houseSkills();
-  assert.deepEqual(skills.map((s) => s.name), ['implement-ticket']);
-  const [house] = skills;
+  assert.deepEqual(skills.map((s) => s.name), ['implement-ticket', 'merge-upstream']);
+  const [house, merge] = skills;
+  assert.equal(merge.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/merge-upstream/SKILL.md');
+  assert.match(merge.frontmatter, /^disable-model-invocation: true$/m);
+  assert.equal(merge.hasSiblings, false);
   assert.equal(house.source, 'devkit');
   assert.equal(house.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/implement-ticket/SKILL.md');
   assert.match(house.frontmatter, /^---\nname: implement-ticket\ndescription: .*\n---\n$/s);
@@ -86,7 +91,7 @@ test('packageSkills throws on a body whose frontmatter is missing or names anoth
 
 test('allSkills: house first, then the dependency; a house skill wins a name clash', () => {
   const root = workspace();
-  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:implement-ticket', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
+  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:implement-ticket', 'devkit:merge-upstream', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
   mkdirSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket'));
   writeFileSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket/SKILL.md'), '---\nname: implement-ticket\ndescription: upstream twin\n---\nbody\n');
   const manifestFile = join(root, SKILLS_PACKAGE_DIR, '.claude-plugin/plugin.json');
@@ -142,15 +147,6 @@ test('withStandardsImport: path relative to the CLAUDE.md location, under the H1
   assert.match(withStandardsImport('', '.claude'), /^<!-- devkit standards.*-->\n@\.\.\/node_modules/);
 });
 
-test('mergeSettingsHook adds the PR-assignee hook once and keeps everything else', () => {
-  const merged = mergeSettingsHook({ permissions: { allow: ['Bash(ls:*)'] }, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo hi' }] }] } });
-  assert.deepEqual(merged.permissions, { allow: ['Bash(ls:*)'] });
-  assert.equal(merged.hooks.PreToolUse.length, 2);
-  assert.match(merged.hooks.PreToolUse[1].hooks[0].command, /--assignee/);
-  assert.deepEqual(mergeSettingsHook(merged), merged, 'idempotent');
-  assert.equal(mergeSettingsHook(undefined).hooks.PreToolUse.length, 1);
-});
-
 test('claudeMdPath prefers an existing .claude/CLAUDE.md, then root CLAUDE.md, else .claude/CLAUDE.md', () => {
   const root = mkdtempSync(join(tmpdir(), 'devkit-claude-'));
   assert.equal(claudeMdPath(root), '.claude/CLAUDE.md');
@@ -167,15 +163,17 @@ test('installClaude writes the layer once, regenerates the stubs, never overwrit
   writeFileSync(join(root, '.claude/CLAUDE.md'), '# Shop\n\nProject rules.\n');
   writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
   const first = await installClaude({ cwd: root, log: quiet });
-  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
+  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
   assert.deepEqual(first.updated.sort(), ['.claude/CLAUDE.md', '.gitignore']);
   assert.match(readFileSync(join(root, '.claude/CLAUDE.md'), 'utf8'), /^# Shop\n\n<!-- devkit standards/);
   assert.match(readFileSync(join(root, '.claude/agents/commit-writer.md'), 'utf8'), /^---\nname: commit-writer\n/);
   assert.match(readFileSync(join(root, '.claude/skills/grilling/SKILL.md'), 'utf8'), /^---\nname: grilling\n/);
   assert.ok(!existsSync(join(root, '.claude/skills/implement/SKILL.md')), 'excluded upstream skill gets no stub');
-  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/tdd/\n.claude/skills/to-spec/\n${GITIGNORE_END}\n`);
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/tdd/\n.claude/skills/to-spec/\n${GITIGNORE_END}\n`);
   const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
   assert.equal(settings.hooks.PreToolUse.length, 1);
+  assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /claude:hook pre-bash$/);
+  assert.match(settings.hooks.PostToolUse[0].hooks[0].command, /claude:hook post-edit$/);
 
   const second = await installClaude({ cwd: root, log: quiet });
   assert.deepEqual([...second.created, ...second.updated, ...second.overwritten], []);
@@ -189,11 +187,27 @@ test('installClaude writes the layer once, regenerates the stubs, never overwrit
   assert.match(readFileSync(join(root, '.claude/skills/grilling/SKILL.md'), 'utf8'), /^description: Grill harder\.$/m);
 });
 
-test('installClaude without the skills dependency writes the house stub only and says what to run', async () => {
+test('installClaude replaces the inline jq PR hook of a devkit ≤ 1.2 consumer with the dispatcher entries', async () => {
+  const root = workspace();
+  mkdirSync(join(root, '.claude'));
+  const legacy = { matcher: 'Bash', hooks: [{ type: 'command', command: 'jq -c \'if (.tool_input.command // "" | test("gh pr create")) then {} else empty end\' # --assignee' }] };
+  writeFileSync(join(root, '.claude/settings.json'), JSON.stringify({ permissions: { allow: ['Bash(ls:*)'] }, hooks: { PreToolUse: [legacy] } }));
+  const summary = await installClaude({ cwd: root, log: quiet });
+  assert.ok(summary.updated.includes('.claude/settings.json'));
+  const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
+  assert.deepEqual(settings.permissions, { allow: ['Bash(ls:*)'] });
+  assert.equal(settings.hooks.PreToolUse.length, 1);
+  assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /claude:hook pre-bash$/);
+  assert.equal(settings.hooks.PostToolUse.length, 1);
+  const again = await installClaude({ cwd: root, log: quiet });
+  assert.deepEqual([...again.created, ...again.updated], []);
+});
+
+test('installClaude without the skills dependency writes the house stubs only and says what to run', async () => {
   const root = workspace({ withSkills: false });
   const logs = [];
   const summary = await installClaude({ cwd: root, log: (l) => logs.push(l) });
-  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/implement-ticket/SKILL.md']);
+  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md']);
   assert.ok(logs.some((l) => /note: mattpocock-skills is not installed[\s\S]*`pnpm install`/.test(l)), logs.join('\n'));
 });
 

@@ -21,7 +21,7 @@ const quiet = () => {};
 test('init scaffolds the seam, merges scripts/config without clobbering, and writes the slot-0 block', async () => {
   const root = freshCopy();
   const summary = await init({ root, log: quiet });
-  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.github/workflows/ci.yml', '.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/skills/implement-ticket/SKILL.md', '.gitignore', '.claude/settings.json']);
+  assert.deepEqual(summary.created, ['scripts/pre-commit-extra.sh', 'lint-staged.config.mjs', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.github/workflows/ci.yml', '.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.gitignore', '.claude/settings.json']);
   assert.match(readFileSync(join(root, '.gitignore'), 'utf8'), new RegExp(`^${GITIGNORE_BEGIN.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\n\\.claude/skills/implement-ticket/\\n`, 'm'));
   assert.match(readFileSync(join(root, '.claude/CLAUDE.md'), 'utf8'), /@\.\.\/node_modules\/@coding-with-hassan\/devkit\/claude\/standards\.md/);
   assert.match(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'), /hassan-devkit ci:affected/);
@@ -58,7 +58,7 @@ test('init is idempotent, keeps edited files, and --force overwrites them', asyn
   assert.deepEqual(second.created, []);
   assert.deepEqual(second.updated, []);
   assert.deepEqual(second.overwritten, []);
-  assert.deepEqual(second.unchanged.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', '.env.dist', '.github/workflows/ci.yml', '.gitignore', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
+  assert.deepEqual(second.unchanged.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.env.dist', '.github/workflows/ci.yml', '.gitignore', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'lint-staged.config.mjs', 'package.json', 'scripts/pre-commit-extra.sh']);
 
   writeFileSync(join(root, 'scripts/pre-commit-extra.sh'), '#!/bin/sh\nexit 1\n');
   const third = await init({ root, log: quiet });
@@ -132,6 +132,6 @@ test('init --only restricts the run to the named parts and rejects unknown ones'
   assert.deepEqual([...first.created, ...first.updated], ['package.json']);
   assert.ok(!existsSync(join(root, 'lint-staged.config.mjs')) && !existsSync(join(root, '.claude')) && !existsSync(join(root, 'docs/agents')));
   const second = await init({ root, only: ['claude', 'agents'], log: quiet });
-  assert.deepEqual(second.created.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', '.gitignore', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
+  assert.deepEqual(second.created.sort(), ['.claude/CLAUDE.md', '.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.gitignore', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
   assert.ok(!existsSync(join(root, '.github/workflows/ci.yml')));
 });
