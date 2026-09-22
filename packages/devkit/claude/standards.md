@@ -8,7 +8,8 @@ generated from the project's tracker config and name the concrete tracker.
 ## Docker
 
 Always use the npm scripts from the root `package.json` for Docker operations — never run
-`docker compose` directly: `pnpm docker:dev:up`, `pnpm docker:dev:down`, `pnpm docker:dev:logs`.
+`docker compose` directly (a hook denies it): `pnpm docker:dev:up`, `pnpm docker:dev:down`,
+`pnpm docker:dev:logs`.
 `docker:dev:up` refreshes the checkout's managed `.env` block (slot, profiles, image tag) and
 builds only the dev images the current dependency manifest lacks; a dependency bump needs
 nothing extra. Never set `DEVKIT_IMAGE_TAG`, `DEVKIT_SLOT`, `DEVKIT_PORT_*` or
@@ -18,7 +19,8 @@ nothing extra. Never set `DEVKIT_IMAGE_TAG`, `DEVKIT_SLOT`, `DEVKIT_PORT_*` or
 
 Ticket work happens in a git worktree with its own Docker stack (own compose project, host
 ports = base + slot × 10, own volumes), never in the main checkout. Manage worktrees only with
-the devkit — never `git worktree` by hand:
+the devkit — never `git worktree` by hand (a hook denies `git worktree add|remove|prune|…`;
+listing is fine):
 
 - `hassan-devkit worktree:create <TICKET>-<Short-Title>` prunes merged worktrees, fetches the
   canonical remote (`upstream`, else `origin`), bases the branch on its `main` (never on the
@@ -35,6 +37,10 @@ the devkit — never `git worktree` by hand:
   deletes the stack and its data; `worktree:prune` removes every worktree whose PR is merged.
 - Starting work anywhere else (an existing branch, the main checkout): sync first with
   `git fetch <remote> && git merge --ff-only <remote>/main`.
+- Bringing the canonical `main` into a branch is the `/merge-upstream` skill (user-invoked, since
+  it creates the merge commit): fetch, merge, and — when the merge conflicts — `pnpm install`
+  BEFORE completing it, so the pre-commit fixers run with the presets upstream was formatted
+  with; a file the hook still rewrote is restored from `<remote>/main`.
 
 ## Committing and pushing
 
@@ -51,8 +57,11 @@ commits and enforces the commit standard CI checks: `hassan-devkit commits:show`
 ticket token, the closed type list, the derived scope list and the exact regex. Commits are
 signed. Never add a Co-Authored-By line or any AI attribution.
 
-Pull requests are created with `gh pr create --assignee @me` (a PreToolUse hook denies the
-command without an assignee) and, for GitHub-tracked issues, end with `Closes #<n>`.
+A commit on the base branch is denied by a hook: ticket work happens in a worktree, and a
+commit that really belongs on `main` is the developer's to make by hand.
+
+Pull requests are created with `gh pr create --assignee @me` (a hook denies the command
+without an assignee) and, for GitHub-tracked issues, end with `Closes #<n>`.
 
 ## Tickets
 
@@ -87,8 +96,22 @@ its `inputs`/`namedInputs`, or a cached replay can be stale. `.nxignore` is not 
 also drop files from task hashing. A new workspace package must be added to every Dockerfile's
 `COPY` list (frozen-lockfile installs need all importers present).
 
-Hooks: git silently skips ALL pre-commit hooks when `.husky/_` is missing. `worktree:create` and
-`pnpm install` (via `hooks:install`) bootstrap it; `hassan-devkit ci:doctor` reports it.
+Every file you edit is formatted on the spot by the `post-edit` hook (`hassan-devkit
+format:file`: the Prettier commands of the project's lint-staged config for that path), so the
+pre-commit abort-on-rewrite is left with ESLint fixes only. When the hook reports that it
+reformatted a file, re-read it before editing it again — the on-disk content moved under you.
+
+Git hooks: git silently skips ALL pre-commit hooks when `.husky/_` is missing. `worktree:create`
+and `pnpm install` (via `hooks:install`) bootstrap it; `hassan-devkit ci:doctor` reports it.
+
+## Claude Code hooks
+
+The hooks in `.claude/settings.json` are managed by `hassan-devkit claude:install` and run
+`hassan-devkit claude:hook <id>`: `pre-bash` evaluates the guards named above (PR assignee,
+direct `docker compose`, `git worktree` by hand, a commit on the base branch) and `post-edit`
+formats the edited file. They are rails for Claude, not locks for the developer: every hook
+fails open, and a denial names the house command to use instead — use it rather than looking
+for a way around the guard.
 
 ## Domain docs
 
