@@ -201,9 +201,10 @@ cache restore, `ci:cache attach`, `nrwl/nx-set-shas`, `ci:check`, `ci:affected`,
 
 Runs from `prepare`. Writes, only when missing, `.claude/agents/commit-writer.md`; regenerates
 on every run one `.claude/skills/<name>/SKILL.md` per skill (stubs, see below) plus the managed
-`.gitignore` block that keeps them out of git; merges the `gh pr create`
-assignee deny hook into `.claude/settings.json` (`PreToolUse` on `Bash`, idempotent by hook
-id), and regenerates `docs/agents/{issue-tracker,triage-labels,domain}.md` from the tracker
+`.gitignore` block that keeps them out of git; merges the two house hook entries into
+`.claude/settings.json` (`PreToolUse` on `Bash` → `claude:hook pre-bash`, `PostToolUse` on
+`Edit|Write|MultiEdit` → `claude:hook post-edit`; idempotent by id, the inline `jq` PR hook of
+≤ 1.2 is dropped), and regenerates `docs/agents/{issue-tracker,triage-labels,domain}.md` from the tracker
 config. Adds the `@node_modules/@coding-with-hassan/devkit/claude/standards.md` line to
 `.claude/CLAUDE.md` if absent.
 
@@ -236,7 +237,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`implement-ticket`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`implement-ticket`, `merge-upstream`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
@@ -249,6 +250,12 @@ contribution. Workbooks are written next to the data and stay gitignored.
   slash command while the qualified plugin name still resolves to the plugin (verified against
   the CLI).
 - **Hooks**: merged into `.claude/settings.json` (committed, team-wide), not `settings.local.json`.
+  The entries only name a dispatcher id (`hassan-devkit claude:hook <id>`); the rules behind them
+  are package code (`core/claude-hooks.js`), unit-tested and released like any other rule, so a
+  guard reaches every project with a bump and no re-commit. Hooks mirror the standards that need
+  no judgment — PR assignee, direct `docker compose`, `git worktree` by hand, a commit on the base
+  branch, format-on-edit through `format:file` — and fail open: a hook that cannot decide answers
+  nothing. The commit/push consent rule stays prose on purpose: consent is a judgment.
 - **Adapters**: `docs/agents/*.md` are generated from config and carry a "generated" header.
 
 ### Shipped rules (`claude/standards.md`)
