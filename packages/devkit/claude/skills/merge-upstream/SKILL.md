@@ -1,13 +1,15 @@
 ---
 name: merge-upstream
-description: "Bring the canonical remote's main into the current checkout the house way: fetch, stop when up to date, merge (fast-forward only on the base branch), install the merged toolchain BEFORE completing a conflicted merge so the pre-commit fixers run with the presets upstream was formatted with, restore hook-rewritten files, then refresh what the merged files need. User-invocable only: it creates the merge commit."
-disable-model-invocation: true
+description: "Bring the canonical remote's main into the current checkout the house way: fetch, stop when up to date, merge (fast-forward only on the base branch), install the merged toolchain BEFORE completing a conflicted merge so the pre-commit fixers run with the presets upstream was formatted with, restore hook-rewritten files, then refresh what the merged files need. Use when the user asks to bring main in, update the branch or fix its PR's conflicts: that ask is the consent for the merge commit."
 ---
 
 # merge-upstream (body shipped by @coding-with-hassan/devkit)
 
-Bring the canonical `main` into the checkout you are in. The user invoking this skill is the
-consent for exactly one commit: the merge commit. Never push; never rebase (branches are shared
+Bring the canonical `main` into the checkout you are in. Run it only when the user asks for
+it in their own words, in the current request: typing `/merge-upstream`, or asking to bring
+`main` in, update the branch or fix its PR's conflicts. That ask is the consent for exactly one
+commit, the merge commit. A branch that is merely behind, or a PR you notice conflicts, is never
+a reason to run it unasked: report it and let the user decide. Never rebase (branches are shared
 through their PRs and the house merges).
 
 ## 1. Where you are
@@ -81,4 +83,6 @@ know, reformats with old options) and the hook aborts the commit listing them.
 
 One short message: the range merged (`<old>..<new>`, count of commits), whether conflicts were
 resolved and in which files, whether `pnpm install` ran, and what the user still has to do
-(restart, regenerate, re-run a build). Do not push.
+(restart, regenerate, re-run a build). Do not push unless the same request asked for it ("fix the
+conflicts and push"); then run the project's pre-push checks first (`hassan-devkit ci:check`
+and `hassan-devkit ci:affected`) and push only when they pass.
