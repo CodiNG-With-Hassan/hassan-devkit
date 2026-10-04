@@ -48,8 +48,8 @@ test('the shipped Claude content names no project', () => {
   }
   assert.doesNotMatch(readFileSync(join(pkgRoot, 'claude/skills/implement-ticket/SKILL.md'), 'utf8'), /^Commit your work/m);
   const merge = readFileSync(join(pkgRoot, 'claude/skills/merge-upstream/SKILL.md'), 'utf8');
-  assert.match(merge, /^disable-model-invocation: true$/m, 'creates a merge commit: user-invocable only');
-  for (const step of ['--ff-only', 'pnpm install --frozen-lockfile', 'git checkout <remote>/<base> -- <file>', 'Do not push']) assert.ok(merge.includes(step), `merge-upstream lacks "${step}"`);
+  assert.doesNotMatch(merge, /^disable-model-invocation:/m, 'model-invocable: a user asking to bring main in is the consent');
+  for (const step of ['--ff-only', 'pnpm install --frozen-lockfile', 'git checkout <remote>/<base> -- <file>', 'Do not push unless', 'in their own words', 'merely behind']) assert.ok(merge.includes(step), `merge-upstream lacks "${step}"`);
 });
 
 test('houseSkills: the skills shipped by the package, with frontmatter naming their folder', () => {
@@ -57,7 +57,7 @@ test('houseSkills: the skills shipped by the package, with frontmatter naming th
   assert.deepEqual(skills.map((s) => s.name), ['implement-ticket', 'merge-upstream']);
   const [house, merge] = skills;
   assert.equal(merge.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/merge-upstream/SKILL.md');
-  assert.match(merge.frontmatter, /^disable-model-invocation: true$/m);
+  assert.doesNotMatch(merge.frontmatter, /^disable-model-invocation:/m);
   assert.equal(merge.hasSiblings, false);
   assert.equal(house.source, 'devkit');
   assert.equal(house.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/implement-ticket/SKILL.md');

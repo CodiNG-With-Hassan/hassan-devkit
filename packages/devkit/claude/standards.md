@@ -37,8 +37,10 @@ listing is fine):
   deletes the stack and its data; `worktree:prune` removes every worktree whose PR is merged.
 - Starting work anywhere else (an existing branch, the main checkout): sync first with
   `git fetch <remote> && git merge --ff-only <remote>/main`.
-- Bringing the canonical `main` into a branch is the `/merge-upstream` skill (user-invoked, since
-  it creates the merge commit): fetch, merge, and — when the merge conflicts — `pnpm install`
+- Bringing the canonical `main` into a branch is the `/merge-upstream` skill, run when the user
+  asks for it (typing it, or asking to bring `main` in or fix a PR's conflicts — that ask is the
+  consent for the merge commit, never a branch that is merely behind): fetch, merge, and — when
+  the merge conflicts — `pnpm install`
   BEFORE completing it, so the pre-commit fixers run with the presets upstream was formatted
   with; a file the hook still rewrote is restored from `<remote>/main`.
 
