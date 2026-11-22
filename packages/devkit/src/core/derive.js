@@ -23,11 +23,17 @@ export function commitScopes(projects, extraScopes = []) {
   return [...new Set([...projects.map((p) => p.name), ...extraScopes])].sort();
 }
 
+/** The token ticket keys start with: the Jira project, the GitHub prefix; `null` without a tracker. */
+export function ticketToken(tracker) {
+  if (tracker?.kind === 'jira') return tracker.project;
+  if (tracker?.kind === 'github') return tracker.prefix;
+  return null;
+}
+
 /** Regex source for the ticket token at the start of a branch name / commit subject. */
 export function ticketPattern(tracker) {
-  if (tracker?.kind === 'jira') return `${tracker.project}-[0-9]+`;
-  if (tracker?.kind === 'github') return `${tracker.prefix}-[0-9]+`;
-  return null;
+  const token = ticketToken(tracker);
+  return token ? `${token}-[0-9]+` : null;
 }
 
 /** `DAZ-42-FE-Some-Feature` → `DAZ-42`; `null` when the branch carries no ticket. */

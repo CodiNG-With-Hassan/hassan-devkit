@@ -10,6 +10,7 @@ import { registerCi } from './commands/ci.js';
 import { registerClaude } from './commands/claude.js';
 import { registerFormat } from './commands/format.js';
 import { registerTestCases } from './commands/test-cases.js';
+import { registerTickets } from './commands/tickets.js';
 
 export function run(argv) {
   const cli = cac('hassan-devkit');
@@ -21,6 +22,7 @@ export function run(argv) {
   registerClaude(cli);
   registerFormat(cli);
   registerTestCases(cli);
+  registerTickets(cli);
   registerDocker(cli);
   registerDb(cli);
   registerHooks(cli);
