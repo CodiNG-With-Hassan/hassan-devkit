@@ -213,7 +213,9 @@ cache restore, `ci:cache attach`, `nrwl/nx-set-shas`, `ci:check`, `ci:affected`,
 
 Runs from `prepare`. Writes, only when missing, `.claude/agents/commit-writer.md`; regenerates
 on every run one `.claude/skills/<name>/SKILL.md` per skill (stubs, see below) plus the managed
-`.gitignore` block that keeps them out of git; merges the two house hook entries into
+`.gitignore` block that keeps them out of git — except a skill the project wrote itself at
+that path (any `SKILL.md` that is not a stub), which is kept, stays committed and is reported
+with a note until the project deletes it; merges the two house hook entries into
 `.claude/settings.json` (`PreToolUse` on `Bash` → `claude:hook pre-bash`, `PostToolUse` on
 `Edit|Write|MultiEdit` → `claude:hook post-edit`; idempotent by id, the inline `jq` PR hook of
 ≤ 1.2 is dropped), and regenerates `docs/agents/{issue-tracker,triage-labels,domain}.md` from the tracker
@@ -249,7 +251,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`implement-ticket`, `merge-upstream`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
