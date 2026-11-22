@@ -24,6 +24,10 @@ import { TICKETS_GRAPH_FILE } from './tickets/graph.js';
  * The stubs are derived on every install (`prepare` → `claude:install`) and gitignored through a
  * managed block, so a version bump never leaves anything to commit. The same block ignores the
  * other file the devkit generates into a checkout: the `tickets:graph` chart.
+ *
+ * One exception to "every skill gets a stub": a `SKILL.md` the project wrote itself at a stub
+ * path (a hand-made skill that predates the shipped one of the same name) is left alone and
+ * stays out of the gitignore block, until the project deletes it (`partitionSkills`).
  */
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -153,7 +157,41 @@ stub never needs to change.${siblings}
 `;
 }
 
-export const stubPath = (name) => `.claude/skills/${name}/SKILL.md`;
+const stubDir = (name) => `.claude/skills/${name}`;
+export const stubPath = (name) => `${stubDir(name)}/SKILL.md`;
+
+/** A stub's whole body, whitespace collapsed: the pointer into `node_modules` and nothing after it. */
+const STUB_BODY = /^Read `node_modules\/[^` ]+\/SKILL\.md` \(relative to the repo root\) and follow it exactly\. That file is the skill's body; it ships with [^.]+ so this stub never needs to change\.( Relative links in that file point at files in the same folder\.)?$/;
+
+/**
+ * Pure: is this text a stub some devkit version wrote? Every version has the same body modulo
+ * line wrapping, so line endings, a BOM and a formatter's reflow are ignored. Anything else at
+ * a stub path — a hand-written skill, a stub the project added a line to — is the project's
+ * own, which errs on the side of keeping a file.
+ */
+export function isSkillStub(text) {
+  const normalised = text.replace(/^\uFEFF/, '').replaceAll('\r\n', '\n');
+  if (!normalised.startsWith('---\n')) return false;
+  const fence = normalised.indexOf('\n---\n', 3);
+  if (fence === -1) return false;
+  return STUB_BODY.test(normalised.slice(fence + 5).replace(/\s+/g, ' ').trim());
+}
+
+/**
+ * Split the skills into the ones that get a stub and the ones the project keeps its own copy
+ * of: a `SKILL.md` at the stub path that is not a stub (a skill the project wrote by hand
+ * before the devkit shipped one of that name). The copy wins until the project deletes it.
+ */
+export function partitionSkills(root, skills) {
+  const stubbed = [];
+  const owned = [];
+  for (const skill of skills) {
+    const file = join(root, stubPath(skill.name));
+    const isOwn = existsSync(file) && !isSkillStub(readFileSync(file, 'utf8'));
+    (isOwn ? owned : stubbed).push(skill);
+  }
+  return { stubbed, owned };
+}
 
 /**
  * Pure: the `.gitignore` text with the managed block listing what the devkit generates and a
@@ -161,7 +199,7 @@ export const stubPath = (name) => `.claude/skills/${name}/SKILL.md`;
  * marker still names only the stubs: it is matched as an exact line in every consumer's file.
  */
 export function withGeneratedIgnored(text, skillNames) {
-  const lines = [...[...skillNames].sort().map((name) => `.claude/skills/${name}/`), TICKETS_GRAPH_FILE];
+  const lines = [...[...skillNames].sort().map((name) => `${stubDir(name)}/`), TICKETS_GRAPH_FILE];
   return upsertMarkedBlock(text ?? '', GITIGNORE_BEGIN, GITIGNORE_END, lines);
 }
 
@@ -176,11 +214,17 @@ export function claudePlans(root, { notes = [] } = {}) {
   if (!skills.some((s) => s.source === SKILLS_PACKAGE)) {
     notes.push(`${SKILLS_PACKAGE} is not installed — \`hassan-devkit init --only config\` adds it to devDependencies; then \`pnpm install\` writes the skill stubs`);
   }
+  // A skill the project wrote itself is neither overwritten nor gitignored: it stays committed.
+  const { stubbed, owned } = partitionSkills(root, skills);
+  for (const skill of owned) {
+    const dir = stubDir(skill.name);
+    notes.push(`${stubPath(skill.name)} is the project's own copy and wins over the \`${skill.name}\` skill shipped by ${skill.source} — delete ${dir}/ (\`git rm -r ${dir}\`) and re-run to switch to the shipped one`);
+  }
   // Derived on every install: managed, so a bumped description flows without --force.
-  for (const skill of skills) plans.push(planFile(root, stubPath(skill.name), skillStub(skill), { managed: true }));
+  for (const skill of stubbed) plans.push(planFile(root, stubPath(skill.name), skillStub(skill), { managed: true }));
   const gitignoreFile = join(root, GITIGNORE_FILE);
   const gitignore = existsSync(gitignoreFile) ? readFileSync(gitignoreFile, 'utf8') : '';
-  plans.push(planFile(root, GITIGNORE_FILE, withGeneratedIgnored(gitignore, skills.map((s) => s.name)), { managed: true }));
+  plans.push(planFile(root, GITIGNORE_FILE, withGeneratedIgnored(gitignore, stubbed.map((s) => s.name)), { managed: true }));
   const settingsFile = join(root, '.claude/settings.json');
   let settings = {};
   if (existsSync(settingsFile)) {

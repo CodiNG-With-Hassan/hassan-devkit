@@ -74,7 +74,8 @@ Everything a project declares lives in the `hassan-devkit` block of the root `pa
     "ready": { "url": "http://localhost:${DEVKIT_PORT_API}/api-json" },
     "env": { "API_PROXY_TARGET": "http://localhost:${DEVKIT_PORT_API}" }
   },
-  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net" },
+  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net",
+               "transitions": { "prOpened": "In Review", "merged": "Acceptance" } },   // optional, these are the defaults; null turns one off
   //        | { "kind": "github", "prefix": "GH" } | { "kind": "none" }
   "commits": { "docsUrl": "https://…/Git+Workflow" },   // types/extraScopes/requireSigned/exemptAuthors have defaults
   "ci": { "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm exec nx run-many -t check-translations" }] },
@@ -110,18 +111,20 @@ One worktree per ticket, each with its own Docker stack (own compose project, ho
 - `hassan-devkit worktree:env [--slot N]` — refresh this checkout's managed block (keeps slot + profiles, recomputes the image tag, builds missing images, drops stale `node_modules` volumes). Refuses a slot another checkout holds. `docker:up` runs it implicitly.
 - `hassan-devkit worktree:profiles list|add|remove <names>` — the compose profiles this stack runs (derived from the compose file; `worktree.profiles.required` cannot be removed).
 - `hassan-devkit worktree:remove <BRANCH> [--keep-data] [--force]` — stack down (volumes deleted unless `--keep-data`), worktree removed, branch kept, unreferenced image tags garbage-collected.
-- `hassan-devkit worktree:prune [--dry-run]` — remove every worktree whose PR is merged (`gh pr list --head`, base repo = `upstream`); dirty trees are never force-removed.
+- `hassan-devkit worktree:prune [--dry-run]` — remove every worktree whose PR is merged (`gh pr list --head`, base repo = `upstream`) and report `merged` to the tracker for its ticket; dirty trees are never force-removed.
 - `hassan-devkit worktree:list` — worktrees with slot, ports, profiles, image tag; warns on duplicate slots.
 
 ### Tracker adapters (`tracker.kind`)
 
-| kind | on `worktree:create` | credentials |
-| --- | --- | --- |
-| `jira` | assign the branch's `<PROJECT>-<n>` ticket to you; `To Do` → `In Progress` | `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_URL` from the environment or `~/.config/jira/env` |
-| `github` | `gh issue edit <n> --add-assignee @me` on the base repo for a `<PREFIX>-<n>-…` branch; PR bodies end with `Closes #<n>` | `gh auth` |
-| `none` | nothing | — |
+| kind | on `worktree:create` | PR opened / PR merged | credentials |
+| --- | --- | --- | --- |
+| `jira` | assign the branch's `<PROJECT>-<n>` ticket to you; `To Do` → `In Progress` | move the ticket to `tracker.transitions.prOpened` (default `In Review`) / `.merged` (default `Acceptance`) | `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_URL` from the environment or `~/.config/jira/env` |
+| `github` | `gh issue edit <n> --add-assignee @me` on the base repo for a `<PREFIX>-<n>-…` branch; PR bodies end with `Closes #<n>` | nothing: an open PR stays the progress signal | `gh auth` |
+| `none` | nothing | nothing | — |
 
-All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree. `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
+- `hassan-devkit tracker:transition <TICKET> <prOpened|merged>` — report a PR event for a ticket (a key, or a branch name starting with it). The jira adapter moves the ticket to the status `tracker.transitions` names for the event, looked up by target status name among the ticket's available transitions; a ticket already in or past that status is left alone, and a key set to `null` turns the transition off. Run it with `prOpened` after opening the PR; `worktree:prune` reports `merged` itself for the ticket of every worktree it removes.
+
+All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree or fails the command (in `tracker:transition`, an unknown event name is a usage error and exits 1). `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
 
 ### Ticket dependency chart (`tickets:graph`)
 
@@ -175,7 +178,7 @@ The hook never rewrites silently. lint-staged re-stages the fixes `eslint --fix`
 
 - one `@import` line in the project's `CLAUDE.md` (`.claude/CLAUDE.md` when it exists) pulling `node_modules/@coding-with-hassan/devkit/claude/standards.md` — Docker via scripts, worktrees, commit/push consent + commit-writer, tickets, the acceptance-case quality gate, lint/format/CI parity, domain docs. In-repo imports load at launch without an approval dialog;
 - `.claude/agents/commit-writer.md` as a **stub** whose body says "read the shipped file and follow it" — the stub never changes, the content ships with the devkit version;
-- one `.claude/skills/<name>/SKILL.md` stub per skill, same pattern: the house skills `implement-ticket` and `merge-upstream` (bodies shipped by the devkit; both model-invocable — `merge-upstream` runs only when the user asks to bring `main` in or fix a PR's conflicts, since that ask is the consent for the merge commit) and every skill of the project's `mattpocock-skills` dependency — `init` adds `github:mattpocock/skills#v1.2.3` to `devDependencies`, a GitHub tarball pinned to an upstream release tag that pnpm integrity-locks — except `implement` and `setup-matt-pocock-skills`, which the house skill and `init` replace. The stub copies the skill's frontmatter verbatim (user-invocable-only skills stay user-only) and points at the body under `node_modules`. Stubs are derived on every install and **gitignored** through a managed block (which also lists the `tickets:graph` chart), so nothing is committed and a bump changes nothing in git; they are what makes the skills reach every clone and the skill pickers that only scan `.claude/skills` (T3 Code). Renovate bumps the tag (the shared preset automerges it), so an upstream skills release needs no devkit release;
+- one `.claude/skills/<name>/SKILL.md` stub per skill, same pattern: the house skills `add-error-code`, `implement-ticket` and `merge-upstream` (bodies shipped by the devkit; all model-invocable — `merge-upstream` runs only when the user asks to bring `main` in or fix a PR's conflicts, since that ask is the consent for the merge commit; `add-error-code` names no project: it finds the API app, the i18n lib and the frontends from `hassan-devkit config:show --json` and follows the error-code contract from there) and every skill of the project's `mattpocock-skills` dependency — `init` adds `github:mattpocock/skills#v1.2.3` to `devDependencies`, a GitHub tarball pinned to an upstream release tag that pnpm integrity-locks — except `implement` and `setup-matt-pocock-skills`, which the house skill and `init` replace. The stub copies the skill's frontmatter verbatim (user-invocable-only skills stay user-only) and points at the body under `node_modules`. Stubs are derived on every install and **gitignored** through a managed block (which also lists the `tickets:graph` chart), so nothing is committed and a bump changes nothing in git; they are what makes the skills reach every clone and the skill pickers that only scan `.claude/skills` (T3 Code). A `SKILL.md` the project wrote itself at one of those paths (anything that is not a stub) is the project's own copy: it is neither overwritten nor gitignored, and `claude:install` prints a note until the folder is deleted, after which the stub takes over. Renovate bumps the tag (the shared preset automerges it), so an upstream skills release needs no devkit release;
 - two managed hook entries merged idempotently into `.claude/settings.json`, both running `hassan-devkit claude:hook <id>` from the checkout's `node_modules` (recognised by that id, so a reworded command replaces the entry and the inline `jq` hook of devkit ≤ 1.2 is dropped): `pre-bash` (`PreToolUse` on `Bash`) denies `gh pr create` without `--assignee`, `docker compose` run directly, `git worktree add|remove|prune|…` and `git commit` on `ci.baseBranch` — each with the house command to use instead; `post-edit` (`PostToolUse` on `Edit|Write|MultiEdit`) runs `format:file` on the edited file and tells Claude to re-read it when Prettier changed it. The rules live in the package, so a bump adds a guard with nothing to re-commit; every hook fails open (a broken hook never blocks a tool call).
 
 Project-specific rules stay in the project's own `CLAUDE.md` below the import. A devkit bump therefore changes what Claude does with nothing to re-commit.
@@ -200,6 +203,7 @@ import { tc, type Area, type KnownIssue, type Readme } from '@coding-with-hassan
 - **CI**: `init --only ci --force` writes the thin workflow; delete hand-rolled affected/cache scripts. Commit scopes are derived from the workspace (`commits:show`).
 - **Claude**: `init --only claude,agents` adds the standards import, the stubs, the PR-assignee hook and regenerates `docs/agents`; trim your `CLAUDE.md` to project specifics.
 - **Skills** (1.1): `init --only config` adds the `mattpocock-skills` devDependency; `pnpm install` then writes the skill stubs and the `.gitignore` block, and `claude:install` prints the one-off `git rm --cached` for the `implement-ticket` stub you committed under 1.0. With the plugin still enabled in `~/.claude`, a bare `/grilling` runs the project stub and `/mattpocock-skills:grilling` the plugin (same body).
+- **`add-error-code`** (1.5): the skill ships with the devkit. A project with its own committed `.claude/skills/add-error-code/` keeps it, and `claude:install` says so on every install. To switch: `git rm -r .claude/skills/add-error-code`, `pnpm install` (writes the stub and adds the folder to the `.gitignore` block), commit the deletion with `.gitignore`. Keep the project's `.claude/rules/api-errors.md`: the shipped skill reads the project-specific names from it.
 - Adopt piece by piece with `init --only <part>`; `ci:doctor` reports what is not adopted yet.
 
 ## Layout-agnostic commands
