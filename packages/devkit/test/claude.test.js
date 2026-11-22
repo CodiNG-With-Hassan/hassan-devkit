@@ -51,6 +51,18 @@ test('the shipped Claude content names no project', () => {
   const merge = readFileSync(join(pkgRoot, 'claude/skills/merge-upstream/SKILL.md'), 'utf8');
   assert.doesNotMatch(merge, /^disable-model-invocation:/m, 'model-invocable: a user asking to bring main in is the consent');
   for (const step of ['--ff-only', 'pnpm install --frozen-lockfile', 'git checkout <remote>/<base> -- <file>', 'Do not push unless', 'in their own words', 'merely behind']) assert.ok(merge.includes(step), `merge-upstream lacks "${step}"`);
+  // open-pr commits, pushes and opens the PR: only the user can start it, and the standards name it as an explicit ask.
+  const openPr = readFileSync(join(pkgRoot, 'claude/skills/open-pr/SKILL.md'), 'utf8');
+  assert.match(openPr, /^disable-model-invocation: true$/m, 'user-invocable only: typing /open-pr is the consent');
+  const openPrSteps = ['base branch', 'the `merge-upstream` skill', 'hassan-devkit ci:check', 'hassan-devkit ci:affected', '`commit-writer` agent', 'git push', 'gh pr create --assignee @me', 'the `pr` skill', 'Closes #<n>', 'gh pr edit', 'hassan-devkit tracker:transition', 'prOpened', 'Stop at the first failure'];
+  for (const step of openPrSteps) assert.ok(openPr.includes(step), `open-pr lacks "${step}"`);
+  assert.match(openPr, /On the base branch[^.]*refuse/, 'open-pr refuses to run on the base branch');
+  const firstStep = openPr.indexOf('## 1.');
+  assert.ok(firstStep > 0, 'open-pr numbers its steps from "## 1."');
+  const order = openPrSteps.slice(1, -1).map((step) => openPr.indexOf(step, firstStep));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the steps come in the order they run');
+  assert.match(standards, /`\/open-pr`[^.]*explicit ask/, 'the consent rule names /open-pr');
+  assert.ok(merge.includes('typing `/open-pr`'), 'merge-upstream knows the caller whose ask covers its merge commit');
   // add-error-code is generic: every path comes from the workspace, none is written down.
   const errorCode = readFileSync(join(pkgRoot, 'claude/skills/add-error-code/SKILL.md'), 'utf8');
   assert.doesNotMatch(errorCode, /\b(apps|libs|packages)\/[\w<]/, 'a fixed workspace path names a project layout');
@@ -62,14 +74,18 @@ test('the shipped Claude content names no project', () => {
 
 test('houseSkills: the skills shipped by the package, with frontmatter naming their folder', () => {
   const skills = houseSkills();
-  assert.deepEqual(skills.map((s) => s.name), ['add-error-code', 'implement-ticket', 'merge-upstream']);
-  const [errorCode, house, merge] = skills;
+  assert.deepEqual(skills.map((s) => s.name), ['add-error-code', 'implement-ticket', 'merge-upstream', 'open-pr']);
+  const [errorCode, house, merge, openPr] = skills;
   assert.equal(errorCode.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/add-error-code/SKILL.md');
   assert.doesNotMatch(errorCode.frontmatter, /^disable-model-invocation:/m, 'model-invocable: a new failure that needs a code is the trigger');
   assert.equal(errorCode.hasSiblings, false);
   assert.equal(merge.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/merge-upstream/SKILL.md');
   assert.doesNotMatch(merge.frontmatter, /^disable-model-invocation:/m);
   assert.equal(merge.hasSiblings, false);
+  assert.equal(openPr.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/open-pr/SKILL.md');
+  assert.match(openPr.frontmatter, /^disable-model-invocation: true$/m, 'user-invocable only: Claude can never start the commits, the push and the PR by itself');
+  assert.match(skillStub(openPr), /^disable-model-invocation: true$/m, 'the flag travels into the project stub');
+  assert.equal(openPr.hasSiblings, false);
   assert.equal(house.source, 'devkit');
   assert.equal(house.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/implement-ticket/SKILL.md');
   assert.match(house.frontmatter, /^---\nname: implement-ticket\ndescription: .*\n---\n$/s);
@@ -102,7 +118,7 @@ test('packageSkills throws on a body whose frontmatter is missing or names anoth
 
 test('allSkills: house first, then the dependency; a house skill wins a name clash', () => {
   const root = workspace();
-  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:add-error-code', 'devkit:implement-ticket', 'devkit:merge-upstream', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
+  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:add-error-code', 'devkit:implement-ticket', 'devkit:merge-upstream', 'devkit:open-pr', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
   mkdirSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket'));
   writeFileSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket/SKILL.md'), '---\nname: implement-ticket\ndescription: upstream twin\n---\nbody\n');
   const manifestFile = join(root, SKILLS_PACKAGE_DIR, '.claude-plugin/plugin.json');
@@ -193,13 +209,13 @@ test('installClaude writes the layer once, regenerates the stubs, never overwrit
   writeFileSync(join(root, '.claude/CLAUDE.md'), '# Shop\n\nProject rules.\n');
   writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
   const first = await installClaude({ cwd: root, log: quiet });
-  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/add-error-code/SKILL.md', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
+  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/add-error-code/SKILL.md', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
   assert.deepEqual(first.updated.sort(), ['.claude/CLAUDE.md', '.gitignore']);
   assert.match(readFileSync(join(root, '.claude/CLAUDE.md'), 'utf8'), /^# Shop\n\n<!-- devkit standards/);
   assert.match(readFileSync(join(root, '.claude/agents/commit-writer.md'), 'utf8'), /^---\nname: commit-writer\n/);
   assert.match(readFileSync(join(root, '.claude/skills/grilling/SKILL.md'), 'utf8'), /^---\nname: grilling\n/);
   assert.ok(!existsSync(join(root, '.claude/skills/implement/SKILL.md')), 'excluded upstream skill gets no stub');
-  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/tdd/\n.claude/skills/to-spec/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/open-pr/\n.claude/skills/tdd/\n.claude/skills/to-spec/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
   const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
   assert.equal(settings.hooks.PreToolUse.length, 1);
   assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /claude:hook pre-bash$/);
@@ -268,7 +284,7 @@ test('installClaude without the skills dependency writes the house stubs only an
   const root = workspace({ withSkills: false });
   const logs = [];
   const summary = await installClaude({ cwd: root, log: (l) => logs.push(l) });
-  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/add-error-code/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md']);
+  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/add-error-code/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md']);
   assert.ok(logs.some((l) => /note: mattpocock-skills is not installed[\s\S]*`pnpm install`/.test(l)), logs.join('\n'));
 });
 
