@@ -3,6 +3,7 @@ import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatJson, planFile, upsertMarkedBlock } from './scaffold.js';
 import { mergeSettingsHooks } from './claude-hooks.js';
+import { TICKETS_GRAPH_FILE } from './tickets/graph.js';
 
 /**
  * The Claude Code layer. Nothing here is copied content: the project's `CLAUDE.md` imports the
@@ -21,7 +22,8 @@ import { mergeSettingsHooks } from './claude-hooks.js';
  *    and listed by its plugin manifest. Renovate bumps the tag, so an upstream release reaches
  *    every project without a devkit release.
  * The stubs are derived on every install (`prepare` → `claude:install`) and gitignored through a
- * managed block, so a version bump never leaves anything to commit.
+ * managed block, so a version bump never leaves anything to commit. The same block ignores the
+ * other file the devkit generates into a checkout: the `tickets:graph` chart.
  */
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -153,9 +155,13 @@ stub never needs to change.${siblings}
 
 export const stubPath = (name) => `.claude/skills/${name}/SKILL.md`;
 
-/** Pure: the `.gitignore` text with the managed block listing every generated stub folder. */
-export function withSkillStubsIgnored(text, skillNames) {
-  const lines = [...skillNames].sort().map((name) => `.claude/skills/${name}/`);
+/**
+ * Pure: the `.gitignore` text with the managed block listing what the devkit generates and a
+ * project never commits — every skill stub folder, then the `tickets:graph` chart. The begin
+ * marker still names only the stubs: it is matched as an exact line in every consumer's file.
+ */
+export function withGeneratedIgnored(text, skillNames) {
+  const lines = [...[...skillNames].sort().map((name) => `.claude/skills/${name}/`), TICKETS_GRAPH_FILE];
   return upsertMarkedBlock(text ?? '', GITIGNORE_BEGIN, GITIGNORE_END, lines);
 }
 
@@ -174,7 +180,7 @@ export function claudePlans(root, { notes = [] } = {}) {
   for (const skill of skills) plans.push(planFile(root, stubPath(skill.name), skillStub(skill), { managed: true }));
   const gitignoreFile = join(root, GITIGNORE_FILE);
   const gitignore = existsSync(gitignoreFile) ? readFileSync(gitignoreFile, 'utf8') : '';
-  plans.push(planFile(root, GITIGNORE_FILE, withSkillStubsIgnored(gitignore, skills.map((s) => s.name)), { managed: true }));
+  plans.push(planFile(root, GITIGNORE_FILE, withGeneratedIgnored(gitignore, skills.map((s) => s.name)), { managed: true }));
   const settingsFile = join(root, '.claude/settings.json');
   let settings = {};
   if (existsSync(settingsFile)) {
