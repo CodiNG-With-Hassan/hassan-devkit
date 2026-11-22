@@ -2,13 +2,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { loadProfiles } from './compose.js';
 import { CONFIG_KEY, ENV_DIST_FILE, ENV_FILE } from './config.js';
-import { expandEnv, imageTag, imageTagInputs, sanitizeName } from './derive.js';
+import { expandEnv, imageTag, imageTagInputs, sanitizeName, ticketKeyFromBranch } from './derive.js';
 import { managedValues, parseEnv, writeManagedBlock } from './env-block.js';
 import { commandExists, run } from './exec.js';
 import * as git from './git.js';
 import { withLock } from './locks.js';
 import * as stack from './stack.js';
-import { startTicket } from './tracker/index.js';
+import { startTicket, transitionTicket } from './tracker/index.js';
 import { listProjects } from './workspace.js';
 
 /**
@@ -502,7 +502,10 @@ export async function cmdRemove(ctx, name, { keepData = false, force = false } =
   ctx.log(`removed ${dir} (branch kept — delete it with: git branch -D ${basename(dir)})`);
 }
 
-/** `worktree:prune` — remove every worktree whose PR is merged (GitHub is the oracle). */
+/**
+ * `worktree:prune` — remove every worktree whose PR is merged (GitHub is the oracle) and
+ * report the merge to the tracker for the ticket of each one it removed.
+ */
 export async function cmdPrune(ctx, { dryRun = false } = {}) {
   if (!commandExists('gh')) {
     ctx.note('gh not installed — cannot check PR states, skipping prune');
@@ -539,12 +542,16 @@ export async function cmdPrune(ctx, { dryRun = false } = {}) {
       continue;
     }
     ctx.log(`prune: ${entry.name}: PR merged — removing worktree, containers, volumes, and branch`);
+    const key = ticketKeyFromBranch(branch, ctx.tracker);
     if (ctx.hasStack && existsSync(join(dir, ENV_FILE))) await stackDown(ctx, dir, { wipe: true });
     if (await git.worktreeRemove(ctx.mainRoot, dir)) {
       await git.branchDelete(ctx.mainRoot, branch);
       removed.push(entry.name);
+      await transitionTicket({ key, event: 'merged', tracker: ctx.tracker, log: ctx.log, note: ctx.note });
     } else {
-      ctx.note(`prune: ${entry.name} has stray changes — check them, then run: hassan-devkit worktree:remove ${entry.name} --force && git branch -D ${branch}`);
+      // The ticket only moves with the worktree prune removes; this one is left to the developer.
+      const move = key && ctx.tracker.transitions?.merged ? ` && hassan-devkit tracker:transition ${key} merged` : '';
+      ctx.note(`prune: ${entry.name} has stray changes — check them, then run: hassan-devkit worktree:remove ${entry.name} --force && git branch -D ${branch}${move}`);
     }
   }
   if (!dryRun) pruneImages(ctx);

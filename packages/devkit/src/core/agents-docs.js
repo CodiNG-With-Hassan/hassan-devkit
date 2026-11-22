@@ -32,9 +32,19 @@ token and commit subjects need none.
   );
 }
 
-function jiraDoc({ project, baseUrl }) {
+function jiraDoc({ project, baseUrl, transitions }) {
   const site = baseUrl ?? 'the Jira site from `JIRA_URL` in `~/.config/jira/env`';
   const k = `${project}-<n>`;
+  const off = (event) => `off (\`tracker.transitions.${event}\` is \`null\`) — the devkit moves nothing, follow the team's workflow by hand.`;
+  const prOpened = transitions.prOpened
+    ? `**PR opened** → \`${transitions.prOpened}\`: run \`hassan-devkit tracker:transition ${k} prOpened\` right after
+    \`gh pr create\`.`
+    : `**PR opened**: ${off('prOpened')}`;
+  const merged = transitions.merged
+    ? `**PR merged** → \`${transitions.merged}\`: \`hassan-devkit worktree:prune\` (run by every \`worktree:create\`) does it for
+    the ticket of each worktree it removes; for a ticket without a worktree, run
+    \`hassan-devkit tracker:transition ${k} merged\`.`
+    : `**PR merged**: ${off('merged')}`;
   return `# Issue tracker: Jira (${project})
 
 Issues and specs for this repo live in the Jira project **${project}** at ${site}. Use the
@@ -68,6 +78,14 @@ Pick the type by this rule, not by gut feel.
   \`GET /rest/api/3/myself\` for your \`accountId\` and \`PUT /rest/api/3/issue/${k}/assignee\`
   with \`{"accountId": "<id>"}\`. Never leave a ticket you are working on unassigned or
   assigned to someone else.
+- **Status — the ticket follows its PR**: \`worktree:create\` moves a \`To Do\` ticket to
+  \`In Progress\`; after that:
+  - ${prOpened}
+  - ${merged}
+
+  A ticket already in or past the target status is left alone, and every failure is a
+  \`note:\` — move the ticket by hand then. The target statuses come from
+  \`hassan-devkit.tracker.transitions\` in \`package.json\` (\`null\` turns one off).
 - **Labels**: set via \`editJiraIssue\` on the \`labels\` field (add/remove by updating the array).
 - **Close**: MCP \`transitionJiraIssue\` — fetch available transitions first with
   \`getTransitionsForJiraIssue\`; the workflow decides valid target states.
