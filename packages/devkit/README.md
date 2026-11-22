@@ -74,7 +74,8 @@ Everything a project declares lives in the `hassan-devkit` block of the root `pa
     "ready": { "url": "http://localhost:${DEVKIT_PORT_API}/api-json" },
     "env": { "API_PROXY_TARGET": "http://localhost:${DEVKIT_PORT_API}" }
   },
-  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net" },
+  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net",
+               "transitions": { "prOpened": "In Review", "merged": "Acceptance" } },   // optional, these are the defaults; null turns one off
   //        | { "kind": "github", "prefix": "GH" } | { "kind": "none" }
   "commits": { "docsUrl": "https://…/Git+Workflow" },   // types/extraScopes/requireSigned/exemptAuthors have defaults
   "ci": { "checks": [{ "name": "translations", "paths": ["^libs/i18n/"], "run": "pnpm exec nx run-many -t check-translations" }] },
@@ -110,18 +111,20 @@ One worktree per ticket, each with its own Docker stack (own compose project, ho
 - `hassan-devkit worktree:env [--slot N]` — refresh this checkout's managed block (keeps slot + profiles, recomputes the image tag, builds missing images, drops stale `node_modules` volumes). Refuses a slot another checkout holds. `docker:up` runs it implicitly.
 - `hassan-devkit worktree:profiles list|add|remove <names>` — the compose profiles this stack runs (derived from the compose file; `worktree.profiles.required` cannot be removed).
 - `hassan-devkit worktree:remove <BRANCH> [--keep-data] [--force]` — stack down (volumes deleted unless `--keep-data`), worktree removed, branch kept, unreferenced image tags garbage-collected.
-- `hassan-devkit worktree:prune [--dry-run]` — remove every worktree whose PR is merged (`gh pr list --head`, base repo = `upstream`); dirty trees are never force-removed.
+- `hassan-devkit worktree:prune [--dry-run]` — remove every worktree whose PR is merged (`gh pr list --head`, base repo = `upstream`) and report `merged` to the tracker for its ticket; dirty trees are never force-removed.
 - `hassan-devkit worktree:list` — worktrees with slot, ports, profiles, image tag; warns on duplicate slots.
 
 ### Tracker adapters (`tracker.kind`)
 
-| kind | on `worktree:create` | credentials |
-| --- | --- | --- |
-| `jira` | assign the branch's `<PROJECT>-<n>` ticket to you; `To Do` → `In Progress` | `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_URL` from the environment or `~/.config/jira/env` |
-| `github` | `gh issue edit <n> --add-assignee @me` on the base repo for a `<PREFIX>-<n>-…` branch; PR bodies end with `Closes #<n>` | `gh auth` |
-| `none` | nothing | — |
+| kind | on `worktree:create` | PR opened / PR merged | credentials |
+| --- | --- | --- | --- |
+| `jira` | assign the branch's `<PROJECT>-<n>` ticket to you; `To Do` → `In Progress` | move the ticket to `tracker.transitions.prOpened` (default `In Review`) / `.merged` (default `Acceptance`) | `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_URL` from the environment or `~/.config/jira/env` |
+| `github` | `gh issue edit <n> --add-assignee @me` on the base repo for a `<PREFIX>-<n>-…` branch; PR bodies end with `Closes #<n>` | nothing: an open PR stays the progress signal | `gh auth` |
+| `none` | nothing | nothing | — |
 
-All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree. `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
+- `hassan-devkit tracker:transition <TICKET> <prOpened|merged>` — report a PR event for a ticket (a key, or a branch name starting with it). The jira adapter moves the ticket to the status `tracker.transitions` names for the event, looked up by target status name among the ticket's available transitions; a ticket already in or past that status is left alone, and a key set to `null` turns the transition off. Run it with `prOpened` after opening the PR; `worktree:prune` reports `merged` itself for the ticket of every worktree it removes.
+
+All best effort: a missing token or unreachable tracker prints a `note:` and never blocks the worktree or fails the command (in `tracker:transition`, an unknown event name is a usage error and exits 1). `init` renders `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md` from this config for the engineering skills.
 
 ### Pre-commit chain
 
