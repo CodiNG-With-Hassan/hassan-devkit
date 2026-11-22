@@ -35,4 +35,5 @@ coverage/
 .claude/skills/wayfinder/
 .claude/skills/wizard/
 .claude/skills/writing-for-agents/
+docs/tickets/dependencies.md
 # <<< hassan-devkit

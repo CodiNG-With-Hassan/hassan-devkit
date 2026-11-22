@@ -10,9 +10,13 @@ import { jiraAdapter } from './jira.js';
  * reported the PR event.
  *
  * Adapter contract: `{ startTicket({ key, branch, tracker, cwd, log, note }),
- * transitionTicket?({ key, event, tracker, log, note }) }`. `transitionTicket` is
- * optional: a tracker without a status to move (`github`, `none` — an open PR stays the
- * progress signal there) leaves it out.
+ * transitionTicket?({ key, event, tracker, log, note }),
+ * readTickets?({ tracker, cwd, note }) }`. `transitionTicket` is optional: a tracker without
+ * a status to move (`github`, `none` — an open PR stays the progress signal there) leaves it
+ * out. `readTickets` is the read operation behind `tickets:graph`: it resolves to
+ * `{ tickets, epics, edges }` (shapes in ../tickets/graph.js) — every ticket that is not done
+ * plus the tickets blocking them; `none` leaves it out. It is the one operation that is not
+ * best effort: without the tracker there is no chart, so a failure is the command's failure.
  */
 
 const adapters = {
@@ -50,4 +54,11 @@ export async function transitionTicket({ key, event, tracker, log = console.log,
   } catch (e) {
     note(`${tracker.kind}: ${e.message} — move ${key} by hand`);
   }
+}
+
+/** The tracker's tickets and blocking edges; `null` when the tracker kind has none to read. */
+export async function readTickets({ tracker, cwd, note = (m) => console.error(`note: ${m}`) }) {
+  const adapter = adapters[tracker.kind];
+  if (!adapter?.readTickets) return null;
+  return adapter.readTickets({ tracker, cwd, note });
 }

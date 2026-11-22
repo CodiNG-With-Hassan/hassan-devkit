@@ -194,6 +194,43 @@ usage error (exit 1); every tracker failure is a `note:` and exit 0.
 The adapter also produces `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`
 (see Claude layer) so the mattpocock skills find the right endpoints and label vocabulary.
 
+### `tickets:graph [--epic <KEY>] [--out <file>]` (GH-54)
+
+The ticket dependency chart as a Mermaid flowchart, so deciding what to start next is one
+command, not a prompt per project. Each adapter gains a read operation, `readTickets`, that
+returns tickets (key, title, status category, epic), epics (key, title) and blocking edges
+(blocker → blocked); everything after that is pure (`core/tickets/graph.js`).
+
+| kind | read operation |
+|---|---|
+| `jira` | `POST /search/jql` for the issues of the project that are not done, then a second search for the issues that block them (done ones, other projects' ones) so they come with their epic. Edges are `Blocks` links, the epic is the parent, the status category is the status's own category. Sub-tasks are left out. |
+| `github` | `gh issue list --state open`, then one `gh issue view` per issue an open one names as blocker or epic. Edges are `Blocked by #<n>` body lines (also `Blocked by: #1, #2` and the `## Blocked by` section of the upstream ticket template; never a mention inside a sentence or a code fence); the epic is the `Part of #<n>` line or the `## Parent` section; closed is done, open with an assignee is in progress (starting a ticket assigns it), open without one is to do. |
+| `none` | none: the command exits 0 with a note. |
+
+- **Scope**: every ticket that is not done, plus the tickets that block them directly. A done
+  blocker one hop away stays visible as the reason a ticket is ready; done work further back is
+  out. `--epic` narrows the first set to one epic and keeps the direct blockers from any epic.
+- **Ready ticket**: not started, and everything that blocks it is done. Computed on the links
+  as read, before scope and reduction, so a blocker that is not a node — an epic, an issue that
+  could not be read — still blocks until it is known to be done.
+- **Transitive reduction**: an edge that a longer path already implies is dropped. Edges go one
+  at a time against what is left, so reachability survives links that form a cycle. A path does
+  not count when it runs through a done ticket: dropping the direct edge would leave the blocked
+  ticket with nothing but finished work in front of it.
+- **Chart**: tickets without an epic first, then one subgraph per epic; nodes classed `todo`,
+  `inProgress`, `done`, and `ready` in place of `todo`. Titles are cut to 60 characters and kept
+  from being read as markup or Markdown (Mermaid 11 prints "Unsupported markdown" in the node
+  for a code span or a link); an epic title carries no break opportunity, because a wrapped
+  subgraph title is drawn over the nodes.
+- **Output**: the chart on stdout, notes on stderr, and a Markdown page (chart, colour key, the
+  ready tickets by name) in `docs/tickets/dependencies.md`. The path is in the managed
+  `.gitignore` block, so the chart is never committed; `--out` writes elsewhere (`.mmd` /
+  `.mermaid`: the chart alone).
+- Unlike `startTicket`, the read is not best effort: without the tracker there is no chart, so
+  a failure exits 1. Only a single referenced issue that cannot be read is a `note:`.
+- Tests cover edge parsing, the issue → ticket mappings, scope, ready detection, the reduction
+  and the rendering from fixtures; none calls a tracker.
+
 ### `ci:*`
 
 | Command | Behaviour |
@@ -213,7 +250,7 @@ cache restore, `ci:cache attach`, `nrwl/nx-set-shas`, `ci:check`, `ci:affected`,
 
 Runs from `prepare`. Writes, only when missing, `.claude/agents/commit-writer.md`; regenerates
 on every run one `.claude/skills/<name>/SKILL.md` per skill (stubs, see below) plus the managed
-`.gitignore` block that keeps them out of git — except a skill the project wrote itself at
+`.gitignore` block that keeps them, and the `tickets:graph` chart, out of git — except a skill the project wrote itself at
 that path (any `SKILL.md` that is not a stub), which is kept, stays committed and is reported
 with a note until the project deletes it; merges the two house hook entries into
 `.claude/settings.json` (`PreToolUse` on `Bash` → `claude:hook pre-bash`, `PostToolUse` on

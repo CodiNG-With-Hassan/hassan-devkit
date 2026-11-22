@@ -17,7 +17,7 @@ import {
   isSkillStub,
   packageSkills,
   skillStub,
-  withSkillStubsIgnored,
+  withGeneratedIgnored,
   withStandardsImport,
 } from '../src/core/claude.js';
 import { installClaude } from '../src/commands/claude.js';
@@ -160,12 +160,12 @@ test('isSkillStub: only a file that is nothing but a devkit pointer into node_mo
   for (const [what, text] of Object.entries(owned)) assert.equal(isSkillStub(text), false, `${what} is the project's own`);
 });
 
-test('withSkillStubsIgnored: one managed block, sorted folders, rewritten in place, hand-written lines kept', () => {
-  const first = withSkillStubsIgnored('node_modules/\n', ['tdd', 'implement-ticket']);
-  assert.equal(first, `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/implement-ticket/\n.claude/skills/tdd/\n${GITIGNORE_END}\n`);
-  const second = withSkillStubsIgnored(`${first}coverage/\n`, ['grilling']);
-  assert.equal(second, `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/grilling/\n${GITIGNORE_END}\ncoverage/\n`);
-  assert.equal(withSkillStubsIgnored(second, ['grilling']), second, 'idempotent');
+test('withGeneratedIgnored: one managed block, sorted stub folders then the ticket chart, rewritten in place, hand-written lines kept', () => {
+  const first = withGeneratedIgnored('node_modules/\n', ['tdd', 'implement-ticket']);
+  assert.equal(first, `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/implement-ticket/\n.claude/skills/tdd/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
+  const second = withGeneratedIgnored(`${first}coverage/\n`, ['grilling']);
+  assert.equal(second, `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/grilling/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\ncoverage/\n`);
+  assert.equal(withGeneratedIgnored(second, ['grilling']), second, 'idempotent');
 });
 
 test('withStandardsImport: path relative to the CLAUDE.md location, under the H1, idempotent', () => {
@@ -199,7 +199,7 @@ test('installClaude writes the layer once, regenerates the stubs, never overwrit
   assert.match(readFileSync(join(root, '.claude/agents/commit-writer.md'), 'utf8'), /^---\nname: commit-writer\n/);
   assert.match(readFileSync(join(root, '.claude/skills/grilling/SKILL.md'), 'utf8'), /^---\nname: grilling\n/);
   assert.ok(!existsSync(join(root, '.claude/skills/implement/SKILL.md')), 'excluded upstream skill gets no stub');
-  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/tdd/\n.claude/skills/to-spec/\n${GITIGNORE_END}\n`);
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/tdd/\n.claude/skills/to-spec/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
   const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
   assert.equal(settings.hooks.PreToolUse.length, 1);
   assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /claude:hook pre-bash$/);
