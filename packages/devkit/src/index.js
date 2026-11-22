@@ -6,6 +6,7 @@ import { registerI18n } from './commands/i18n.js';
 import { registerInit } from './commands/init.js';
 import { registerConfig } from './commands/config.js';
 import { registerWorktree } from './commands/worktree.js';
+import { registerTracker } from './commands/tracker.js';
 import { registerCi } from './commands/ci.js';
 import { registerClaude } from './commands/claude.js';
 import { registerFormat } from './commands/format.js';
@@ -17,6 +18,7 @@ export function run(argv) {
   registerInit(cli);
   registerConfig(cli);
   registerWorktree(cli);
+  registerTracker(cli);
   registerCi(cli);
   registerClaude(cli);
   registerFormat(cli);
