@@ -79,7 +79,8 @@ car-rental after migration; keys marked _derived_ are never written by a project
       "API_SPEC_URL": "http://localhost:${DEVKIT_PORT_API}/api-json"
     }
   },
-  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://inventorie.atlassian.net" },
+  "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://inventorie.atlassian.net",
+               "transitions": { "prOpened": "In Review", "merged": "Acceptance" } },   // default; null turns one off
   // or: { "kind": "github", "prefix": "GH" }  — repo taken from `gh repo view`
   // or: { "kind": "none" }
   "commits": {
@@ -165,7 +166,7 @@ import line, `.claude/agents` + `.claude/skills` stubs, the `.claude/settings.js
 | `env [--slot N]` | Recompute the managed block for the current checkout keeping slot + profiles; refuse a slot another checkout holds; build missing images; drop `node_modules` volumes of stale tags; warn on missing `node_modules` / `.husky/_`. `docker:up` runs this implicitly when `worktree` is configured, so the `docker.preUp` hook is no longer needed for it. |
 | `profiles list\|add\|remove` | Mutate `COMPOSE_PROFILES`; `add` ups the new services, `remove` stops them; `profiles.required` cannot be removed. |
 | `remove <name> [--keep-data] [--force]` | Stack down (`-v` unless `--keep-data`) across all profiles, `git worktree remove`, GC unreferenced image tags. Branch kept. |
-| `prune [--dry-run]` | For every worktree ask `gh pr list --repo <base> --head <branch> --state all` (never `pr view`, which cannot see fork heads); only `MERGED` removes stack, worktree and branch. Dirty worktrees are never force-removed. |
+| `prune [--dry-run]` | For every worktree ask `gh pr list --repo <base> --head <branch> --state all` (never `pr view`, which cannot see fork heads); only `MERGED` removes stack, worktree and branch, and then reports `merged` to the tracker for the removed worktree's ticket. Dirty worktrees are never force-removed. |
 | `list` | `git worktree list` + slot/ports/profiles/tag per checkout + duplicate-slot warnings. |
 
 Locks: `mkdir`-based with pid reclaim, `.slot.lock` (120 s) and `.image-build.lock` (1800 s)
@@ -173,11 +174,22 @@ under `worktree.baseDir`, never nested.
 
 ### Tracker adapters (`core/tracker/`)
 
-| kind | on `worktree:create` | credentials |
-|---|---|---|
-| `jira` | `GET /myself` → `PUT /issue/<key>/assignee`; if status is `To Do`, transition to `In Progress`. Best effort: every failure is a `note:` and exit 0. | `~/.config/jira/env` (`JIRA_EMAIL`, `JIRA_API_TOKEN`, optional `JIRA_URL`/`JIRA_BASE_URL`) or the same names in the environment |
-| `github` | `gh issue edit <n> --add-assignee @me` when the branch starts with `<PREFIX>-<n>`. Nothing else: the open PR is the progress signal. | `gh auth` |
-| `none` | nothing | — |
+| kind | on `worktree:create` | PR opened / PR merged | credentials |
+|---|---|---|---|
+| `jira` | `GET /myself` → `PUT /issue/<key>/assignee`; if status is `To Do`, transition to `In Progress`. Best effort: every failure is a `note:` and exit 0. | Move the ticket to `tracker.transitions.prOpened` (default `In Review`) / `.merged` (default `Acceptance`); `null` turns one off. Same best effort. | `~/.config/jira/env` (`JIRA_EMAIL`, `JIRA_API_TOKEN`, optional `JIRA_URL`/`JIRA_BASE_URL`) or the same names in the environment |
+| `github` | `gh issue edit <n> --add-assignee @me` when the branch starts with `<PREFIX>-<n>`. Nothing else: the open PR is the progress signal. | nothing | `gh auth` |
+| `none` | nothing | nothing | — |
+
+The ticket follows its PR through two events, in lifecycle order `prOpened` → `merged`.
+`tracker:transition <ticket> <prOpened|merged>` reports one (the ticket is a key or a branch
+name starting with it) and `worktree:prune` reports `merged` for the ticket of every worktree it
+removes. The jira adapter reads the ticket's status, then looks the transition up by target
+status name among the ticket's available transitions (`GET /issue/<key>/transitions`,
+`to.name`). A ticket already in the target status, in a done status, or in the target status
+of a later event is left alone: a workflow that allows every transition would otherwise let a
+late `prOpened` pull a ticket back out of `Acceptance`. Jira does not expose the order of a
+workflow's statuses, so any other status counts as before the target. A wrong event name is a
+usage error (exit 1); every tracker failure is a `note:` and exit 0.
 
 The adapter also produces `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`
 (see Claude layer) so the mattpocock skills find the right endpoints and label vocabulary.

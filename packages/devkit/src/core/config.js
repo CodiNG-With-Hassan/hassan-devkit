@@ -22,7 +22,8 @@ import { sanitizeName } from './derive.js';
  *       "ready": { "url": "http://localhost:${DEVKIT_PORT_API}/api-json", "timeoutSeconds": 600 },
  *       "env": { "API_PROXY_TARGET": "http://localhost:${DEVKIT_PORT_API}" }
  *     },
- *     "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net" }
+ *     "tracker": { "kind": "jira", "project": "DAZ", "baseUrl": "https://x.atlassian.net",
+ *                  "transitions": { "prOpened": "In Review", "merged": "Acceptance" } }  // target status per event; null = off
  *              | { "kind": "github", "prefix": "GH" }
  *              | { "kind": "none" },
  *     "commits": { "types": [...], "extraScopes": [...], "requireSigned": true,
@@ -50,6 +51,13 @@ export const DEFAULT_GITHUB_PREFIX = 'GH';
 export const DEFAULT_NODE_VERSION = '24';
 export const DEFAULT_BASE_BRANCH = 'main';
 export const TRACKER_KINDS = ['jira', 'github', 'none'];
+/**
+ * The ticket events after "work started", in lifecycle order, each with the status the
+ * jira tracker moves the ticket to by default. The order matters: a ticket sitting in a
+ * later event's status is past the earlier one.
+ */
+export const DEFAULT_TRANSITIONS = { prOpened: 'In Review', merged: 'Acceptance' };
+export const TRANSITION_EVENTS = Object.keys(DEFAULT_TRANSITIONS);
 
 const isString = (v) => typeof v === 'string';
 const isNonEmptyString = (v) => isString(v) && v.trim().length > 0;
@@ -130,6 +138,16 @@ export function validateConfig(raw) {
         errors.push(`${CONFIG_KEY}.tracker.project: expected a Jira project key like "DAZ"`);
       }
       expect(`${CONFIG_KEY}.tracker.baseUrl`, tr.baseUrl, (v) => isNonEmptyString(v) && /^https?:\/\//.test(v), 'an http(s) URL');
+      if (tr.transitions !== undefined) {
+        const p = `${CONFIG_KEY}.tracker.transitions`;
+        if (!isPlainObject(tr.transitions)) errors.push(`${p}: expected an object`);
+        else {
+          for (const [event, status] of Object.entries(tr.transitions)) {
+            if (!TRANSITION_EVENTS.includes(event)) errors.push(`${p}.${event}: unknown key (known: ${TRANSITION_EVENTS.join(', ')})`);
+            else if (status !== null && !isNonEmptyString(status)) errors.push(`${p}.${event}: expected a status name or null (null turns the transition off)`);
+          }
+        }
+      }
     } else if (tr.kind === 'github') {
       expect(`${CONFIG_KEY}.tracker.prefix`, tr.prefix, (v) => isNonEmptyString(v) && /^[A-Z][A-Z0-9]*$/.test(v), 'an upper-case token like "GH"');
     }
@@ -252,7 +270,7 @@ export function resolveConfig(raw = {}, { rootName }) {
   const tr = raw.tracker ?? { kind: 'none' };
   const tracker =
     tr.kind === 'jira'
-      ? { kind: 'jira', project: tr.project, baseUrl: tr.baseUrl ?? null }
+      ? { kind: 'jira', project: tr.project, baseUrl: tr.baseUrl ?? null, transitions: { ...DEFAULT_TRANSITIONS, ...(tr.transitions ?? {}) } }
       : tr.kind === 'github'
         ? { kind: 'github', prefix: tr.prefix ?? DEFAULT_GITHUB_PREFIX }
         : { kind: 'none' };

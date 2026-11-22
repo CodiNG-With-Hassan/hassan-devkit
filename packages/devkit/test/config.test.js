@@ -39,7 +39,24 @@ test('tracker kinds resolve with their defaults', () => {
     kind: 'jira',
     project: 'DAZ',
     baseUrl: null,
+    transitions: { prOpened: 'In Review', merged: 'Acceptance' },
   });
+});
+
+test('jira transitions: each key defaults on its own, null turns that transition off', () => {
+  const transitions = (t) => resolveConfig({ tracker: { kind: 'jira', project: 'DAZ', transitions: t } }, { rootName: 'x' }).tracker.transitions;
+  assert.deepEqual(transitions({ prOpened: 'Code Review' }), { prOpened: 'Code Review', merged: 'Acceptance' });
+  assert.deepEqual(transitions({ merged: null }), { prOpened: 'In Review', merged: null });
+  assert.deepEqual(transitions({ prOpened: null, merged: 'Done' }), { prOpened: null, merged: 'Done' });
+  assert.deepEqual(validateConfig({ tracker: { kind: 'jira', project: 'DAZ', transitions: { prOpened: null, merged: 'Done' } } }), []);
+});
+
+test('tracker.transitions validation reports a wrong shape, a typo in a key and a non-status value', () => {
+  const errorsFor = (transitions) => validateConfig({ tracker: { kind: 'jira', project: 'DAZ', transitions } }).join('\n');
+  assert.match(errorsFor('In Review'), /tracker\.transitions: expected an object/);
+  assert.match(errorsFor({ prOpen: 'In Review' }), /tracker\.transitions\.prOpen: unknown key \(known: prOpened, merged\)/);
+  assert.match(errorsFor({ merged: '' }), /tracker\.transitions\.merged: expected a status name or null/);
+  assert.match(errorsFor({ prOpened: false }), /tracker\.transitions\.prOpened: expected a status name or null/);
 });
 
 test('validation reports typos, wrong types and cross-field rules with paths', () => {
