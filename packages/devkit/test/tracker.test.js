@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agentsDocs, renderIssueTrackerDoc, renderTriageLabelsDoc } from '../src/core/agents-docs.js';
-import { githubAssignArgs } from '../src/core/tracker/github.js';
-import { registerTracker, startTicket } from '../src/core/tracker/index.js';
-import { resolveJiraCredentials } from '../src/core/tracker/jira.js';
+import { githubAssignArgs, githubListArgs, githubMissingReferences, githubTicketData, githubViewArgs, parseBlockedBy, parseParent } from '../src/core/tracker/github.js';
+import { readTickets, registerTracker, startTicket } from '../src/core/tracker/index.js';
+import { jiraKeysJql, jiraMissingReferences, jiraOpenJql, jiraSearchBody, jiraTicketData, jiraWithBlockers, resolveJiraCredentials } from '../src/core/tracker/jira.js';
 
 test('resolveJiraCredentials: process env wins, file fills the gaps, config baseUrl wins over both', () => {
   const file = 'JIRA_URL="https://acme.atlassian.net/"\nexport JIRA_EMAIL=me@acme.test\nJIRA_API_TOKEN=\'tok\'\n';
@@ -61,4 +61,131 @@ test('docs/agents renderers carry the tracker specifics and the generated header
     agentsDocs({ kind: 'none' }).map(([p]) => p),
     ['docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md'],
   );
+});
+
+test('parseBlockedBy: `Blocked by #<n>` lines and a `## Blocked by` section, never prose', () => {
+  assert.deepEqual(parseBlockedBy('Intro.\n\nBlocked by #53\nBlocked by #57\r\nBlocked by #53\n'), [53, 57]);
+  assert.deepEqual(parseBlockedBy('**Blocked by:** #12, #13 and #14'), [12, 13, 14]);
+  assert.deepEqual(parseBlockedBy('- blocked by #9'), [9]);
+  assert.deepEqual(parseBlockedBy('## What to build\n\nA thing.\n\n## Blocked by\n\n- #21\n- #22\n\n## Notes\n\nSee #23.'), [21, 22]);
+  assert.deepEqual(parseBlockedBy('## Blocked by\n\nNone — can start immediately'), []);
+  assert.deepEqual(parseBlockedBy('4. Ask the user; a `Blocked by #<n>` line is appended.\nThis was blocked by #5 earlier.\nBlocked by other/repo#7'), []);
+  assert.deepEqual(parseBlockedBy(null), []);
+  assert.deepEqual(parseBlockedBy('- [ ] Blocked by #5\n* [x] Blocked by #6 (the cart)'), [5, 6], 'task-list items');
+  assert.deepEqual(parseBlockedBy('Blocked by: none (see #20)\nBlocked by nothing yet, maybe #21'), [], 'only the references that follow the phrase');
+  assert.deepEqual(parseBlockedBy('```\nBlocked by #30\n```\n\n## Blocked by\n\n~~~sh\n# not a heading, #31\n~~~\n- #32'), [32], 'a code fence is an example, not a link');
+});
+
+test('parseParent: the `Part of #<n>` line or the `## Parent` section', () => {
+  assert.equal(parseParent('Part of #40\n\nBlocked by #41'), 40);
+  assert.equal(parseParent('## Parent\n\n#40\n\n## What to build\n\nSee #41.'), 40);
+  assert.equal(parseParent('It is part of #40 in spirit.'), null);
+  assert.equal(parseParent(''), null);
+});
+
+const ghIssue = (number, title, state, body = '', assignees = []) => ({ number, title, state, body, assignees });
+const ghOpen = [
+  ghIssue(40, 'Checkout', 'OPEN'),
+  ghIssue(42, 'Pay', 'OPEN', 'Part of #40\n\nBlocked by #41', [{ login: 'dev' }]),
+  ghIssue(43, 'Receipt', 'OPEN', 'Part of #40\nBlocked by #42\nBlocked by #99'),
+  ghIssue(44, 'Loose end', 'OPEN'),
+];
+
+test('github read: open issues name the closed ones to fetch; issues become tickets, epics and edges', () => {
+  assert.deepEqual(githubMissingReferences(ghOpen), [41, 99]);
+  const data = githubTicketData([...ghOpen, ghIssue(41, 'Cart', 'CLOSED', 'Part of #40', [{ login: 'dev' }])], { kind: 'github', prefix: 'GH' });
+  assert.deepEqual(data.tickets, [
+    { key: 'GH-42', title: 'Pay', status: 'in-progress', epic: 'GH-40' },
+    { key: 'GH-43', title: 'Receipt', status: 'todo', epic: 'GH-40' },
+    { key: 'GH-44', title: 'Loose end', status: 'todo', epic: null },
+    { key: 'GH-41', title: 'Cart', status: 'done', epic: 'GH-40' },
+  ]);
+  assert.deepEqual(data.epics, [{ key: 'GH-40', title: 'Checkout', status: 'todo' }], 'an issue others are part of is an epic, not a ticket');
+  assert.deepEqual(githubTicketData([ghIssue(42, 'Pay', 'OPEN', 'Part of #40')], { kind: 'github', prefix: 'GH' }).epics, [{ key: 'GH-40', title: '', status: 'todo' }], 'an epic that was not read is not known to be done');
+  assert.deepEqual(data.edges, [
+    { from: 'GH-41', to: 'GH-42' },
+    { from: 'GH-42', to: 'GH-43' },
+    { from: 'GH-99', to: 'GH-43' },
+  ]);
+  assert.deepEqual(githubListArgs('o/r'), ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,body,state,assignees', '--repo', 'o/r']);
+  assert.deepEqual(githubViewArgs(41, null), ['issue', 'view', '41', '--json', 'number,title,body,state,assignees']);
+});
+
+const BLOCKS = { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' };
+const jiraIssue = (key, summary, category, { level = 0, parent = null, links = [] } = {}) => ({
+  key,
+  fields: { summary, status: { statusCategory: { key: category } }, issuetype: { hierarchyLevel: level, subtask: level < 0 }, parent, issuelinks: links },
+});
+const epicStub = (key, summary, category = 'indeterminate') => ({ key, fields: { summary, status: { statusCategory: { key: category } }, issuetype: { hierarchyLevel: 1 } } });
+const jiraOpen = [
+  jiraIssue('DAZ-10', 'Checkout', 'indeterminate', { level: 1 }),
+  jiraIssue('DAZ-12', 'Pay', 'indeterminate', { parent: epicStub('DAZ-10', 'Checkout'), links: [{ type: BLOCKS, inwardIssue: { key: 'DAZ-11' } }, { type: BLOCKS, outwardIssue: { key: 'DAZ-13' } }] }),
+  jiraIssue('DAZ-13', 'Receipt', 'new', {
+    parent: epicStub('DAZ-20', 'Search', 'done'),
+    links: [{ type: BLOCKS, inwardIssue: { key: 'DAZ-12' } }, { type: { name: 'Relates' }, inwardIssue: { key: 'DAZ-99' } }, { type: BLOCKS, inwardIssue: { key: 'OPS-4' } }],
+  }),
+  jiraIssue('DAZ-14', 'Write the receipt mail', 'new', { level: -1, parent: { key: 'DAZ-13', fields: { summary: 'Receipt', issuetype: { hierarchyLevel: 0 } } } }),
+  jiraIssue('DAZ-15', 'Loose end', 'new'),
+];
+
+test('jira read: open issues name the blockers to fetch; issues become tickets, epics and edges', () => {
+  assert.deepEqual(jiraMissingReferences(jiraOpen), ['DAZ-11', 'OPS-4']);
+  const data = jiraTicketData([...jiraOpen, jiraIssue('DAZ-11', 'Cart', 'done', { parent: epicStub('DAZ-10', 'Checkout'), links: [{ type: BLOCKS, outwardIssue: { key: 'DAZ-12' } }] })]);
+  assert.deepEqual(data.tickets, [
+    { key: 'DAZ-12', title: 'Pay', status: 'in-progress', epic: 'DAZ-10' },
+    { key: 'DAZ-13', title: 'Receipt', status: 'todo', epic: 'DAZ-20' },
+    { key: 'DAZ-15', title: 'Loose end', status: 'todo', epic: null },
+    { key: 'DAZ-11', title: 'Cart', status: 'done', epic: 'DAZ-10' },
+  ]);
+  assert.deepEqual(
+    data.epics,
+    [
+      { key: 'DAZ-10', title: 'Checkout', status: 'in-progress' },
+      { key: 'DAZ-20', title: 'Search', status: 'done' },
+    ],
+    'an epic is known from its own issue or from a child that names it; sub-tasks are not tickets',
+  );
+  assert.deepEqual(
+    data.edges,
+    [
+      { from: 'DAZ-11', to: 'DAZ-12' },
+      { from: 'DAZ-12', to: 'DAZ-13' },
+      { from: 'OPS-4', to: 'DAZ-13' },
+    ],
+    'a link is reported by both of its issues and counted once; only Blocks links are edges',
+  );
+});
+
+test('jira read: a blocker the second search did not return is taken as its link embeds it', () => {
+  const embedded = { key: 'OPS-4', fields: { summary: 'Rotate the keys', status: { statusCategory: { key: 'done' } }, issuetype: { hierarchyLevel: 0 } } };
+  const open = [jiraIssue('DAZ-13', 'Receipt', 'new', { links: [{ type: BLOCKS, inwardIssue: embedded }, { type: BLOCKS, inwardIssue: { key: 'DAZ-11' } }] })];
+  const fetched = [jiraIssue('DAZ-11', 'Cart', 'done', { parent: epicStub('DAZ-10', 'Checkout') })];
+  assert.deepEqual(
+    jiraTicketData(jiraWithBlockers(open, fetched)).tickets.map((t) => [t.key, t.status, t.epic]),
+    [
+      ['DAZ-13', 'todo', null],
+      ['DAZ-11', 'done', 'DAZ-10'],
+      ['OPS-4', 'done', null],
+    ],
+  );
+});
+
+test('jira read: the search requests', () => {
+  assert.equal(jiraOpenJql('DAZ'), 'project = "DAZ" AND statusCategory != Done ORDER BY key ASC');
+  assert.equal(jiraKeysJql(['DAZ-11', 'OPS-4']), 'key in ("DAZ-11", "OPS-4")');
+  assert.deepEqual(jiraSearchBody('project = "DAZ"', 'tok'), { jql: 'project = "DAZ"', fields: ['summary', 'status', 'issuetype', 'parent', 'issuelinks'], maxResults: 100, nextPageToken: 'tok' });
+  assert.deepEqual(Object.keys(jiraSearchBody('x', null)), ['jql', 'fields', 'maxResults'], 'the first page carries no token');
+});
+
+test('readTickets: the adapter\'s read operation, `null` for a tracker without one, failures are not swallowed', async () => {
+  assert.equal(await readTickets({ tracker: { kind: 'none' } }), null);
+  const data = { tickets: [], epics: [], edges: [] };
+  registerTracker('reads', { readTickets: async ({ tracker, cwd }) => ({ ...data, seen: [tracker.kind, cwd] }) });
+  assert.deepEqual(await readTickets({ tracker: { kind: 'reads' }, cwd: '/repo' }), { ...data, seen: ['reads', '/repo'] });
+  registerTracker('down', {
+    readTickets: async () => {
+      throw new Error('unreachable');
+    },
+  });
+  await assert.rejects(readTickets({ tracker: { kind: 'down' } }), /unreachable/);
 });
