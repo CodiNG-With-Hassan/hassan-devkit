@@ -6,8 +6,9 @@ description: "Bring the canonical remote's main into the current checkout the ho
 # merge-upstream (body shipped by @coding-with-hassan/devkit)
 
 Bring the canonical `main` into the checkout you are in. Run it only when the user asks for
-it in their own words, in the current request: typing `/merge-upstream`, or asking to bring
-`main` in, update the branch or fix its PR's conflicts. That ask is the consent for exactly one
+it in their own words, in the current request: typing `/merge-upstream`, typing `/open-pr`
+(this skill is its first step), or asking to bring `main` in, update the branch or fix its PR's
+conflicts. That ask is the consent for exactly one
 commit, the merge commit. A branch that is merely behind, or a PR you notice conflicts, is never
 a reason to run it unasked: report it and let the user decide. Never rebase (branches are shared
 through their PRs and the house merges).
