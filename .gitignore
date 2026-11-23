@@ -22,6 +22,7 @@ coverage/
 .claude/skills/implement-ticket/
 .claude/skills/improve-codebase-architecture/
 .claude/skills/merge-upstream/
+.claude/skills/open-pr/
 .claude/skills/prototype/
 .claude/skills/research/
 .claude/skills/resolving-merge-conflicts/
