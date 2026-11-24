@@ -103,7 +103,8 @@ car-rental after migration; keys marked _derived_ are never written by a project
   },
   "testCases": { "dir": "docs/testing", "languages": ["en", "nl"] },
   "db": { "service": "db", "user": "postgres", "name": "de_autozaak" },     // existing
-  "docker": { "preUp": null }                                               // existing; worktree env now runs implicitly
+  "docker": { "preUp": null },                                              // existing; worktree env now runs implicitly
+  "design": { "url": "https://claude.ai/artifact/…" }                       // the design system `sync-theme` reads (GH-59); optional
 }
 ```
 
@@ -304,7 +305,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `ticket-graph`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `sync-theme`, `ticket-graph`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
@@ -332,6 +333,23 @@ contribution. Workbooks are written next to the data and stay gitignored.
   given, so the pending work is checked and committed first, then merged, and the checks run
   again on the merged result: nothing is committed unchecked. The `pr` skill ships with `mattpocock-skills` from v1.3; a project on an older
   tag gets a plain body (what changed and why, how it was verified, what to review).
+- **`sync-theme`** (GH-59): a project's theme starts from a Claude design system, and turning
+  that into the theme library was redone by prompt for each project and again at every design
+  change. It is a skill and adds no command: mapping a brand's tokens onto a PrimeNG preset is
+  a judgment (which colour is the primary ramp, which step carries text), not a transformation
+  a script can own. The one thing declared is the link, `design.url`, because it is the only
+  input that cannot be derived; the skill asks for it once and stores it, so a re-run after a
+  design change needs no question. Everything else is found: the theme library and the
+  frontends from `config:show --json`, the values from the design system's `tokens.json`, its
+  README and its uploaded assets, read through the artifact tool (the link is private, a web
+  fetch gets the sign-in page). Two rules keep a re-run safe. The design system gives every
+  value and the project keeps its structure, so a token goes only where the theme or the base
+  preset already has a key for it; one with no counterpart is reported, and growing the theme
+  stays the user's decision. And nothing is guessed: an unreadable design system stops the
+  skill, a logo is copied and never redrawn, and a value the skill had to compute (a ramp
+  from a single brand colour, through `palette()`) is listed as derived. It is model-invocable
+  because it writes to the working tree only: it stops on the base branch, runs
+  `ci:affected` and never commits.
 - **Hooks**: merged into `.claude/settings.json` (committed, team-wide), not `settings.local.json`.
   The entries only name a dispatcher id (`hassan-devkit claude:hook <id>`); the rules behind them
   are package code (`core/claude-hooks.js`), unit-tested and released like any other rule, so a
@@ -376,7 +394,8 @@ any project's.
   app, browser-only) and `apps/web-customer` (Angular customer site, server-side rendered).
 - **Libs**, all consumed as source: `api-types` and `api-client` (generated from the committed
   OpenAPI spec), `i18n` (the language list and the `ERRORS` catalog), `theme` (a PrimeNG preset
-  with a neutral placeholder ramp), `web-ui` (logo, theme and language switches, field errors,
+  with a neutral placeholder ramp, which the `sync-theme` skill replaces from the project's
+  design system), `web-ui` (logo, theme and language switches, field errors,
   the `translateError` pipe), `shared-utils` and `assets`.
 - **Stack**: the compose file with profiles (`api` by default, `customer`, `admin`, `extras`)
   and `DEVKIT_` ports, one dev Dockerfile per app, the scaffolded CI workflow, the shared
