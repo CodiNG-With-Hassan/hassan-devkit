@@ -59,6 +59,23 @@ test('tracker.transitions validation reports a wrong shape, a typo in a key and 
   assert.match(errorsFor({ prOpened: false }), /tracker\.transitions\.prOpened: expected a status name or null/);
 });
 
+test('design.url: the design system link, null until a project stores one', () => {
+  assert.deepEqual(resolveConfig({}, { rootName: 'x' }).design, { url: null });
+  assert.deepEqual(resolveConfig({ design: {} }, { rootName: 'x' }).design, { url: null });
+  const url = 'https://claude.ai/artifact/abc123';
+  assert.deepEqual(validateConfig({ design: { url } }), []);
+  assert.deepEqual(resolveConfig({ design: { url } }, { rootName: 'x' }).design, { url });
+});
+
+test('design validation reports a wrong shape, a typo in a key and a value that is not a link', () => {
+  const errorsFor = (design) => validateConfig({ design }).join('\n');
+  assert.match(errorsFor('https://claude.ai/artifact/abc123'), /hassan-devkit\.design: expected an object/);
+  assert.match(errorsFor({ link: 'https://claude.ai/artifact/abc123' }), /design\.link: unknown key \(known: url\)/);
+  assert.match(errorsFor({ url: 'claude.ai/artifact/abc123' }), /design\.url: expected an http\(s\) URL/);
+  assert.match(errorsFor({ url: '' }), /design\.url: expected an http\(s\) URL/);
+  assert.match(errorsFor({ url: null }), /design\.url: expected an http\(s\) URL/);
+});
+
 test('validation reports typos, wrong types and cross-field rules with paths', () => {
   const errors = validateConfig({
     worktrees: {},
