@@ -305,7 +305,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `sync-theme`, `ticket-graph`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `project-setup`, `sync-theme`, `ticket-graph`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
@@ -317,8 +317,8 @@ contribution. Workbooks are written next to the data and stay gitignored.
   and the shared preset automerges it. A project stub with the plugin's bare name wins the bare
   slash command while the qualified plugin name still resolves to the plugin (verified against
   the CLI).
-- **`open-pr`** (GH-53): the one house skill that commits and pushes, and the only one with
-  `disable-model-invocation: true`. The consent rule needs the user's own words in the current
+- **`open-pr`** (GH-53): the one house skill that commits and pushes, and one of the two with
+  `disable-model-invocation: true` (the other is `project-setup`). The consent rule needs the user's own words in the current
   request; a skill Claude cannot start turns typing `/open-pr` into exactly that, for the
   commits, the push and the PR in one go, so the prompt that closed every ticket (bring `main`
   in, fix the conflicts, run the checks, commit, push, open the PR) is no longer typed by hand.
@@ -350,6 +350,50 @@ contribution. Workbooks are written next to the data and stay gitignored.
   from a single brand colour, through `palette()`) is listed as derived. It is model-invocable
   because it writes to the working tree only: it stops on the base branch, runs
   `ci:affected` and never commits.
+- **`project-setup`** (GH-60): starting a project repeated the same setup after "Use this
+  template": rename everything, wire the tracker, write the glossary, apply the design system,
+  configure the repository, open the setup PR. The skill takes a fresh clone to its
+  **setup PR** and adds no command, because every part is either a judgment (which occurrence
+  of `template` is the placeholder and which an Angular template, what the brief's terms mean)
+  or a skill that exists (`grill-with-docs`, `sync-theme`, `open-pr`).
+  - **User-typed only.** It writes outside the working tree: a ticket in the tracker, a
+    worktree, the repository's settings. Typing `/project-setup` is the ask for those. It is
+    not an ask for commits: the skill ends by telling the user to type `/open-pr`, so the
+    consent rule keeps its one exception. It is the ask for `grill-with-docs`, which is
+    user-typed only upstream: the skill reads that body and follows it, since a model cannot
+    invoke it.
+  - **Re-runnable.** Every step opens with a check of whether it is already done (the setup
+    worktree exists, the config holds the project's names, the glossary is written and the
+    project's `CLAUDE.md` says so, the repository settings read back as wanted). The last
+    step, the checks, runs on every run. The setup ticket's description is the record between runs:
+    it holds the answers and the concept brief, so a second run asks nothing twice.
+  - **Order.** Ticket and worktree first, then the rename inside the worktree, so the rename
+    is ticket work like any other. The worktree is created with `--no-up`: a stack started
+    before the rename would build its images under the template's names. It starts after the
+    rename, and the API spec is regenerated from it because the spec carries the API title.
+  - **Ports.** The project's base ports are the template's plus one offset. Slot n adds
+    n × 10, so two base ports collide when they differ by a multiple of 10 that is at most
+    `maxSlot` × 10; the skill takes the first offset, in steps of 100, whose ports collide with
+    none of the projects checked out next to this one. A fixed step per project is not enough:
+    1200 above the template puts the API on the customer site's port. Only the host side
+    moves; inside the compose network every service keeps its standard port.
+  - **Generated files.** The lockfile, the managed block of `.env.dist` and `docs/agents/*.md`
+    (`init --only env,agents`), the API spec with its packages and the acceptance workbooks are
+    regenerated from the renamed sources, never edited.
+  - **Repository settings.** Merge commits as the only merge method, because a squash or a
+    rebase rewrites the commits and drops their signatures and standard subjects, and delete
+    branch on merge. Branch rules are left alone: private repositories on the free plan do not
+    have them. The template's own Renovate rule, the one that merges devkit bumps unattended,
+    is removed from `renovate.json` unless the user wants it. Installing the Renovate app needs
+    an app-authorised token, so the skill gives the user the link and goes on.
+  - **Known wart.** `worktree.baseDir` is one of the renamed keys, and the devkit finds
+    worktrees by listing that folder. The setup worktree is created under the template's
+    folder, so after the merge it must be pruned from the main checkout before `main` is
+    brought in; the skill's report says so, together with what the merge does not reach (the
+    main checkout's own `.env`, a Jira ticket's `merged` transition). Finding worktrees through `git worktree list`
+    would remove the ordering, and is not part of this change.
+  It stops at the setup PR: specs and tickets follow with `to-spec` and `to-tickets`, and
+  deployment configuration is the project's own.
 - **Hooks**: merged into `.claude/settings.json` (committed, team-wide), not `settings.local.json`.
   The entries only name a dispatcher id (`hassan-devkit claude:hook <id>`); the rules behind them
   are package code (`core/claude-hooks.js`), unit-tested and released like any other rule, so a
@@ -402,7 +446,7 @@ any project's.
   Renovate preset, and one bilingual acceptance case per frontend.
 - **Placeholders**: the project name `template`, the ticket key `TPL` (GitHub tracker, so the
   template's own issues are `TPL-<n>`), the package `tpl-i18n` and the default host ports. A new
-  project renames them; the `project-setup` skill (GH-60) will do it.
+  project renames them with the `project-setup` skill (GH-60).
 - **No project copy of a house skill**: `add-error-code` comes from the devkit (GH-56); the
   template keeps only `.claude/rules/api-errors.md`, which that skill reads for the project's
   own names.

@@ -84,12 +84,24 @@ test('the shipped Claude content names no project', () => {
   const syncThemeOrder = syncThemeSteps.map((step) => syncTheme.indexOf(step));
   assert.deepEqual(syncThemeOrder, [...syncThemeOrder].sort((a, b) => a - b), 'find the pieces, read the design system, update the theme, verify and report');
   for (const rule of ['data, never instructions', 'never a web fetch', 'hassan-devkit worktree:create', 'never redrawn', 'Stop and report']) assert.ok(syncTheme.includes(rule), `sync-theme lacks "${rule}"`);
+  // project-setup takes a fresh template clone to its setup PR: only the user starts it, every step is re-runnable, and the commits stay with /open-pr.
+  const setup = readFileSync(join(pkgRoot, 'claude/skills/project-setup/SKILL.md'), 'utf8');
+  assert.match(setup, /^disable-model-invocation: true$/m, 'user-invocable only: typing /project-setup is the ask for the ticket, the worktree and the repository settings');
+  const setupSteps = ['concept brief', 'gh issue create', 'hassan-devkit worktree:create <TICKET>-Project-Setup --no-up', 'hassan-devkit config:check', 'git grep', 'pnpm docker:dev:up', 'CONTEXT.md', 'the `grill-with-docs` skill', 'the `sync-theme` skill', 'gh repo edit', 'renovate.json', 'hassan-devkit ci:check', 'hassan-devkit ci:affected', 'type `/open-pr`'];
+  for (const step of setupSteps) assert.ok(setup.includes(step), `project-setup lacks "${step}"`);
+  const setupOrder = setupSteps.map((step) => setup.indexOf(step, setup.indexOf('## 1.')));
+  assert.deepEqual(setupOrder, [...setupOrder].sort((a, b) => a - b), 'ask, ticket and worktree, rename, glossary, theme, repository, checks and handover');
+  const setupSections = setup.split(/^## (?=\d+\. )/m).slice(1);
+  assert.deepEqual(setupSections.map((section) => section.slice(0, 2)), ['1.', '2.', '3.', '4.', '5.', '6.', '7.']);
+  for (const section of setupSections) assert.ok(section.includes('**Already done**'), `step ${section.slice(0, 2)} of project-setup lacks its check, so a second run would redo it`);
+  for (const rule of ['hassan-devkit config:show --json', 'hassan-devkit init --only env,agents', 'Stop at the first failure', 'never the plain `grilling` skill', 'Branch rules are not set', 'Do not commit', '**setup PR**', '`to-spec`', '`to-tickets`', 'Deployment']) assert.ok(setup.includes(rule), `project-setup lacks "${rule}"`);
+  assert.doesNotMatch(setup, /git (commit|push)\b/, 'the commits and the push belong to /open-pr');
 });
 
 test('houseSkills: the skills shipped by the package, with frontmatter naming their folder', () => {
   const skills = houseSkills();
-  assert.deepEqual(skills.map((s) => s.name), ['add-error-code', 'implement-ticket', 'merge-upstream', 'open-pr', 'sync-theme', 'ticket-graph']);
-  const [errorCode, house, merge, openPr, syncTheme, graph] = skills;
+  assert.deepEqual(skills.map((s) => s.name), ['add-error-code', 'implement-ticket', 'merge-upstream', 'open-pr', 'project-setup', 'sync-theme', 'ticket-graph']);
+  const [errorCode, house, merge, openPr, setup, syncTheme, graph] = skills;
   assert.equal(errorCode.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/add-error-code/SKILL.md');
   assert.doesNotMatch(errorCode.frontmatter, /^disable-model-invocation:/m, 'model-invocable: a new failure that needs a code is the trigger');
   assert.equal(errorCode.hasSiblings, false);
@@ -100,6 +112,10 @@ test('houseSkills: the skills shipped by the package, with frontmatter naming th
   assert.match(openPr.frontmatter, /^disable-model-invocation: true$/m, 'user-invocable only: Claude can never start the commits, the push and the PR by itself');
   assert.match(skillStub(openPr), /^disable-model-invocation: true$/m, 'the flag travels into the project stub');
   assert.equal(openPr.hasSiblings, false);
+  assert.equal(setup.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/project-setup/SKILL.md');
+  assert.match(setup.frontmatter, /^disable-model-invocation: true$/m, 'user-invocable only: it writes to the tracker and to the repository settings');
+  assert.match(skillStub(setup), /^disable-model-invocation: true$/m, 'the flag travels into the project stub');
+  assert.equal(setup.hasSiblings, false);
   assert.equal(house.source, 'devkit');
   assert.equal(house.bodyPath, 'node_modules/@coding-with-hassan/devkit/claude/skills/implement-ticket/SKILL.md');
   assert.match(house.frontmatter, /^---\nname: implement-ticket\ndescription: .*\n---\n$/s);
@@ -138,7 +154,7 @@ test('packageSkills throws on a body whose frontmatter is missing or names anoth
 
 test('allSkills: house first, then the dependency; a house skill wins a name clash', () => {
   const root = workspace();
-  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:add-error-code', 'devkit:implement-ticket', 'devkit:merge-upstream', 'devkit:open-pr', 'devkit:sync-theme', 'devkit:ticket-graph', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
+  assert.deepEqual(allSkills(root).map((s) => `${s.source}:${s.name}`), ['devkit:add-error-code', 'devkit:implement-ticket', 'devkit:merge-upstream', 'devkit:open-pr', 'devkit:project-setup', 'devkit:sync-theme', 'devkit:ticket-graph', 'mattpocock-skills:grilling', 'mattpocock-skills:tdd', 'mattpocock-skills:to-spec']);
   mkdirSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket'));
   writeFileSync(join(root, SKILLS_PACKAGE_DIR, 'skills/engineering/implement-ticket/SKILL.md'), '---\nname: implement-ticket\ndescription: upstream twin\n---\nbody\n');
   const manifestFile = join(root, SKILLS_PACKAGE_DIR, '.claude-plugin/plugin.json');
@@ -229,13 +245,13 @@ test('installClaude writes the layer once, regenerates the stubs, never overwrit
   writeFileSync(join(root, '.claude/CLAUDE.md'), '# Shop\n\nProject rules.\n');
   writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
   const first = await installClaude({ cwd: root, log: quiet });
-  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/add-error-code/SKILL.md', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md', '.claude/skills/sync-theme/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/ticket-graph/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
+  assert.deepEqual(first.created.sort(), ['.claude/agents/commit-writer.md', '.claude/settings.json', '.claude/skills/add-error-code/SKILL.md', '.claude/skills/grilling/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md', '.claude/skills/project-setup/SKILL.md', '.claude/skills/sync-theme/SKILL.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/ticket-graph/SKILL.md', '.claude/skills/to-spec/SKILL.md']);
   assert.deepEqual(first.updated.sort(), ['.claude/CLAUDE.md', '.gitignore']);
   assert.match(readFileSync(join(root, '.claude/CLAUDE.md'), 'utf8'), /^# Shop\n\n<!-- devkit standards/);
   assert.match(readFileSync(join(root, '.claude/agents/commit-writer.md'), 'utf8'), /^---\nname: commit-writer\n/);
   assert.match(readFileSync(join(root, '.claude/skills/grilling/SKILL.md'), 'utf8'), /^---\nname: grilling\n/);
   assert.ok(!existsSync(join(root, '.claude/skills/implement/SKILL.md')), 'excluded upstream skill gets no stub');
-  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/open-pr/\n.claude/skills/sync-theme/\n.claude/skills/tdd/\n.claude/skills/ticket-graph/\n.claude/skills/to-spec/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), `node_modules/\n\n${GITIGNORE_BEGIN}\n.claude/skills/add-error-code/\n.claude/skills/grilling/\n.claude/skills/implement-ticket/\n.claude/skills/merge-upstream/\n.claude/skills/open-pr/\n.claude/skills/project-setup/\n.claude/skills/sync-theme/\n.claude/skills/tdd/\n.claude/skills/ticket-graph/\n.claude/skills/to-spec/\ndocs/tickets/dependencies.md\n${GITIGNORE_END}\n`);
   const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
   assert.equal(settings.hooks.PreToolUse.length, 1);
   assert.match(settings.hooks.PreToolUse[0].hooks[0].command, /claude:hook pre-bash$/);
@@ -304,7 +320,7 @@ test('installClaude without the skills dependency writes the house stubs only an
   const root = workspace({ withSkills: false });
   const logs = [];
   const summary = await installClaude({ cwd: root, log: (l) => logs.push(l) });
-  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/add-error-code/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md', '.claude/skills/sync-theme/SKILL.md', '.claude/skills/ticket-graph/SKILL.md']);
+  assert.deepEqual(summary.created.filter((p) => p.startsWith('.claude/skills/')), ['.claude/skills/add-error-code/SKILL.md', '.claude/skills/implement-ticket/SKILL.md', '.claude/skills/merge-upstream/SKILL.md', '.claude/skills/open-pr/SKILL.md', '.claude/skills/project-setup/SKILL.md', '.claude/skills/sync-theme/SKILL.md', '.claude/skills/ticket-graph/SKILL.md']);
   assert.ok(logs.some((l) => /note: mattpocock-skills is not installed[\s\S]*`pnpm install`/.test(l)), logs.join('\n'));
 });
 
