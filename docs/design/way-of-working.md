@@ -232,6 +232,21 @@ returns tickets (key, title, status category, epic), epics (key, title) and bloc
 - Tests cover edge parsing, the issue → ticket mappings, scope, ready detection, the reduction
   and the rendering from fixtures; none calls a tracker.
 
+The command sees links only. An **unlinked dependency**, one that a ticket description states
+and no link records, is found by reading prose, which is a judgment: that part is the house
+skill `ticket-graph` (GH-55), not adapter code. The skill runs the command, reads the
+descriptions of the tickets on the chart, redraws the chart with the unlinked dependencies as
+dashed edges and lists each with the sentence it came from. A dependency is not proposed when
+the tracker already links it, when the chart implies it through a path of unfinished tickets
+(the reduction would drop that edge anyway), or when a done ticket, an epic or a sub-task sits
+at either end. The skill then asks which ones to record; that answer is the only consent for a
+tracker write. A confirmed dependency becomes the link the adapter reads (jira: a `Blocks` link
+with the blocker as inward issue; github: a `Blocked by #<n>` line appended to the issue body),
+and the command runs again, which also verifies the write: the dependency comes back as a solid
+arrow or a path of unfinished tickets, and one the chart's scope leaves out is read back from
+the tracker. The write stays in the skill (`gh`, the Jira issue-link call) and adds no adapter
+operation: it happens once per confirmed link, in front of the user.
+
 ### `ci:*`
 
 | Command | Behaviour |
@@ -289,7 +304,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `ticket-graph`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
