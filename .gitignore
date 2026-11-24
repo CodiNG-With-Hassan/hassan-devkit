@@ -23,6 +23,7 @@ coverage/
 .claude/skills/improve-codebase-architecture/
 .claude/skills/merge-upstream/
 .claude/skills/open-pr/
+.claude/skills/project-setup/
 .claude/skills/prototype/
 .claude/skills/research/
 .claude/skills/resolving-merge-conflicts/
