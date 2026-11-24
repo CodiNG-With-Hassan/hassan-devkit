@@ -1,5 +1,91 @@
 # @coding-with-hassan/devkit
 
+## 1.5.0
+
+### Minor Changes
+
+- c31109c: The `add-error-code` skill ships with the devkit as a house skill, so the hand-copied versions in the API projects stop drifting and a project that never had one gets it on the next `pnpm install`.
+  - **One generic body** (`claude/skills/add-error-code/SKILL.md`). It names no project and no workspace path: it reads `hassan-devkit config:show --json` and takes the API app (`kind: "api"`, the project holding the `ErrorCode` enum), the i18n lib (the `lib` whose `src/errors/` holds one catalog per language, which is also the language list) and the frontends (`kind: "spa"`) from `derived.projects`, and the acceptance-case folder and languages from `config.testCases`. The procedure is the one the copies shared: enum member, every catalog plus the `ERROR_CODES` / `ERROR_CODE_PARAMS` mirrors, the spec and generated packages regenerated from the worktree's own stack, the reachability note, the acceptance cases, then `check-translations` and the contract drift check. What the body does name is the contract's own vocabulary, identical in every project that adopted it (`DomainException`, `ERROR_CODES`, `I18N_CATALOG_VERSION`, the `api:types` and `check-translations` scripts). Names only one project knows (the rendering pipe, the ADR) come from that project's `.claude/rules/api-errors.md`, which the skill reads first when it exists. In a project without the contract it stops and reports; without `testCases` configured it skips the acceptance cases and says so.
+  - **`claude:install` installs it everywhere**, like `implement-ticket` and `merge-upstream`: a generated, gitignored `.claude/skills/add-error-code/SKILL.md` stub pointing at the shipped body.
+  - **A project's own copy is kept.** A `SKILL.md` at a stub path that is anything other than a devkit-written stub (a hand-written skill, or a stub the project added text to) is the project's own skill: `claude:install` no longer overwrites it, leaves its folder out of the managed `.gitignore` block and prints a note naming the file on every install. This holds for every skill name, house or `mattpocock-skills`. Before this release such a file was silently replaced by the stub.
+
+  Migrating a project that has its own committed copy: `git rm -r .claude/skills/add-error-code`, run `pnpm install` (it writes the stub and adds the folder to the `.gitignore` block), then commit the deletion together with `.gitignore`. Keep `.claude/rules/api-errors.md`: the shipped skill relies on it for the project-specific names. Until the copy is deleted, nothing changes for that project.
+
+- 450646f: New house rule in `claude/standards.md`: a grilling session asks its rounds through Claude Code's question dialog (the `AskUserQuestion` tool), not as numbered text. Until now a round was printed as `Q1 … recommended answer` and answered in prose, and the dialog was only used when you asked for it in the session.
+  - **Every grilling session**, whichever skill started it: `grilling`, `grill-me`, `grill-with-docs` and the skills that grill as one of their steps, under the bare name (`/grill-with-docs`) or the plugin-qualified one (`/mattpocock-skills:grill-with-docs`). The rule lives in the standards because they are the only devkit content loaded on both paths; the generated stubs are unchanged.
+  - **How a round is asked**: the options are the answers themselves, not a yes or no on a recommendation. The recommended answer is the first option, labelled "(Recommended)"; the other options are the real alternatives, each with its trade-off. The dialog always offers a free-text answer, so no option is spent on "Other". Every question is self-contained, because the text written earlier in the turn may not be on screen. A round of more than four questions is asked as several dialogs in the same turn. Something you must read first (a summary, a draft) is shown before the dialog opens. The closing confirmation of the shared understanding is asked through the dialog too.
+  - **Only how a question is put to you changes.** The rounds, the frontier, looking facts up instead of asking, and confirming before acting stay as the skill body says.
+  - **Fallback**: where the dialog is not available (a non-interactive run, another agent harness), the skill's own text format is used.
+  - **Precedence, stated once**: where a house rule and a skill body differ, the house rule wins, even when the skill's stub says to follow the body exactly.
+
+  Content only: no command changes and nothing to run after the bump.
+
+- eacc6b3: New house skill `open-pr`: one user-typed step from finished work to an open PR. Until now `merge-upstream` covered bringing `main` in, and the rest (run the checks, commit, push, open the PR) was typed by hand at the end of every ticket.
+  - **User-typed only.** The skill has `disable-model-invocation: true`, so Claude can never start it. Typing `/open-pr` is the explicit ask for the commits, the push and the PR in one go; `standards.md` now says so in the commit/push consent section.
+  - **Steps**, stopping at the first failure and reporting it:
+    1. run the `merge-upstream` skill;
+    2. run `hassan-devkit ci:check` and `hassan-devkit ci:affected` (both read the working tree, so pending work is checked before it is committed);
+    3. when there is pending work, plan the commits with the `commit-writer` agent and execute the plan;
+    4. push the branch to `origin`, never forced;
+    5. no open PR for the branch: `gh pr create --assignee @me`, titled `<TICKET> <Short title>` from the branch name, with a body written with the `pr` skill and ending with the tracker's ticket reference (`Closes #<n>` for GitHub). A PR already open: its body is rewritten so it describes the branch as it is now;
+    6. run `hassan-devkit tracker:transition <TICKET> prOpened`;
+    7. report the PR link.
+  - **It refuses to run on the base branch**: nothing is merged, committed or pushed there.
+  - When uncommitted work collides with what the merge brings in, a bare `merge-upstream` stops. Here the ask for the commits is already given, so the pending work is checked and committed first, then merged, and the checks run again on the merged result. Nothing is committed unchecked.
+  - The `pr` skill ships with `mattpocock-skills` from v1.3. A project on an older tag gets a plain body: what changed and why, how it was verified, what a reviewer should look at.
+  - `merge-upstream` names `/open-pr` among the asks that are the consent for its merge commit.
+  - `claude:install` installs it like the other house skills: a generated, gitignored `.claude/skills/open-pr/SKILL.md` stub on the next `pnpm install`.
+
+- 79da5e9: New house skill `project-setup`: a repository freshly created from the template, taken to its setup PR. Starting a project repeated the same setup after "Use this template": rename everything, wire the tracker, write the glossary, apply the design system, configure the repository and open the setup PR.
+  - **User-typed only.** The skill has `disable-model-invocation: true`: it writes outside the working tree (a ticket in the tracker, a worktree, the repository's settings), so Claude can never start it. Typing `/project-setup` is the ask for those. It is not an ask for commits or a push: the skill ends by telling you to type `/open-pr`.
+  - **Re-runnable.** Every step first checks whether it is already done, so after an interruption you type it again and it continues where it stopped. The last step, the checks, runs on every run. The setup ticket's description holds the answers and the concept brief, so nothing is asked twice.
+  - **Steps**, stopping at the first failure and reporting it:
+    1. ask for the project name, the tracker (a Jira project, or GitHub issues with a ticket key), the languages and a concept brief (a file or pasted text); derive the slug, the database name and a set of host ports that collide with none of the projects checked out next to it, and show them for correction;
+    2. create the setup ticket in the tracker and its worktree, `hassan-devkit worktree:create <TICKET>-Project-Setup --no-up`;
+    3. rename the template's placeholders in that worktree: the `hassan-devkit` config block, the project name, the ticket key and the `tpl-i18n` package, the host ports (host side only) and the languages. Generated files are regenerated, never edited: the lockfile, the managed block of `.env.dist` and `docs/agents/*.md` (`hassan-devkit init --only env,agents`), the API spec and its packages from the worktree's own stack, the acceptance workbooks;
+    4. run the `grill-with-docs` skill on the concept brief (never the plain `grilling` skill), which writes `CONTEXT.md` and an ADR for each decision the brief forces;
+    5. run the `sync-theme` skill, skipped and reported when the project has no design system yet;
+    6. set the repository settings: merge commits as the only merge method and delete branch on merge. Branch rules are not set: they are unavailable on private repositories on the free plan. For Renovate it removes the template's own automerge rule from `renovate.json` and gives you the link to add the repository to the Renovate app;
+    7. run `hassan-devkit ci:check` and `hassan-devkit ci:affected`, report, and hand over to `/open-pr` for the setup PR.
+  - **After the merge**, the report tells you to run `hassan-devkit worktree:prune` in the main checkout before bringing `main` in: the setup worktree was created under the template's `worktree.baseDir`, and the devkit stops looking there once the project's own config is in. It also names what the merge does not reach: the main checkout's own `.env`, and with a Jira tracker the ticket's `merged` transition.
+  - **It stops at the setup PR.** Specs and tickets are the next stage, with the `to-spec` and `to-tickets` skills. Deployment configuration is out of scope.
+  - `claude:install` installs it like the other house skills: a generated, gitignored `.claude/skills/project-setup/SKILL.md` stub on the next `pnpm install`.
+
+- 63412da: New house skill `sync-theme`: the theme library derived from the project's design system. A project's theme starts from a Claude design system, and turning that into the PrimeNG preset was redone by prompt for each project and again whenever the design changed.
+  - **New optional config `design.url`**: the link of the project's design system, in the `hassan-devkit` block of the root `package.json`. `config:check` reports a value that is not an http(s) URL and any other key under `design`; `config:show --json` prints `config.design.url`, `null` when no link is stored. Nothing else about the design is declared: the values are read from the design system.
+  - **What the skill does**:
+    1. takes the link from `design.url`; when it is missing it asks for it and stores it, so the next run needs no question;
+    2. reads the design system through the artifact tool: its README, `tokens.json` (colours per colour scheme, typography, radii, spacing) and its uploaded logo assets;
+    3. updates the PrimeNG preset of the theme library, the font setup of every frontend, and their logo and favicon;
+    4. runs `hassan-devkit ci:affected`, updates the acceptance cases that state what changed, and reports what changed, what it derived, what in the design system has no counterpart in the preset, and what the theme keeps that the design system does not mention.
+  - **Generic body**: it names no project and no workspace path. The theme library (the `lib` holding the `definePreset` call) and the frontends (`kind: "spa"`) come from `hassan-devkit config:show --json`; the theme library's own README is read first and wins where it is more specific.
+  - **What it never does**: guess a value (a design system that cannot be read stops the skill), redraw a logo (assets are copied), add a token group to hold a design token the theme has no place for (it is reported instead), or commit. It stops on the base branch: a theme change is ticket work in a worktree.
+  - **Invocation**: model-invocable. Asking to sync or update the theme, the brand colours, the fonts or the logo from the design system triggers it; `/sync-theme` works too.
+  - **`claude:install` installs it everywhere**, like the other house skills: a generated, gitignored `.claude/skills/sync-theme/SKILL.md` stub pointing at the shipped body. The next `pnpm install` writes it and adds the folder to the managed `.gitignore` block.
+
+- 1a0f60e: New house skill `ticket-graph`: the ticket dependency chart plus the dependencies the tracker has no link for. `tickets:graph` only sees links; a dependency that is only written in a ticket description was missing from the chart, and the ticket it blocks could show as ready.
+  - **What it does**: runs `hassan-devkit tickets:graph` (with `--epic` when you named one) and shows the chart, reads the descriptions of the tickets on it, and looks for dependencies that have no link. It shows the chart again with those as dashed edges and lists each with the sentence it came from. A dependency that is already linked, that the chart implies through a path of unfinished tickets, or that has a done ticket at either end is not proposed.
+  - **Recording**: it asks which ones to record and writes nothing to the tracker before that answer. A confirmed dependency becomes the link `tickets:graph` reads — a `Blocks` link in Jira (blocker as inward issue), a `Blocked by #<n>` line appended to the GitHub issue body — and the command runs again, so a write that did not land shows up at once.
+  - **Invocation**: model-invocable. Asking for the ticket graph, what blocks what or what to start next triggers it; `/ticket-graph` works too.
+  - **`claude:install` installs it everywhere**, like the other house skills: a generated, gitignored `.claude/skills/ticket-graph/SKILL.md` stub pointing at the shipped body. The next `pnpm install` writes it and adds the folder to the managed `.gitignore` block.
+
+- 5299546: New command `hassan-devkit tickets:graph [--epic <KEY>] [--out <file>]`: the ticket dependency chart of the configured tracker as a Mermaid flowchart, so deciding what to start next no longer means asking for the chart by prompt in every project.
+  - **Scope**: every ticket that is not done, plus the tickets that block them directly (a done blocker one hop away stays visible). `--epic` narrows to one epic and keeps the blockers from other epics; a bare `241` or `#241` takes the tracker's ticket token.
+  - **Chart**: one subgraph per epic, an arrow from a blocker to the ticket it blocks, nodes coloured by status category (to do, in progress, done). Ready tickets — not started, every blocker done — are highlighted; a blocker that is not a node (an epic, an issue that could not be read) still counts until it is done. An edge that a longer path of unfinished tickets already implies is dropped (transitive reduction).
+  - **Trackers**: `jira` reads the project's issues that are not done with their `Blocks` links and parent, plus the issues blocking them (sub-tasks are left out). `github` reads the open issues plus the issues they reference; edges come from `Blocked by #<n>` body lines (also `Blocked by: #1, #2` and a `## Blocked by` section), the epic from the `Part of #<n>` line or `## Parent` section, and an open issue with an assignee counts as in progress. `none` exits with a note. A tracker that cannot be read fails the command.
+  - **Output**: the chart on stdout and a Markdown page (chart, colour key, the ready tickets by name) in `docs/tickets/dependencies.md`; `--out` writes elsewhere, and a `.mmd` / `.mermaid` file gets the chart alone. The managed `.gitignore` block now lists `docs/tickets/dependencies.md`, so the chart is never committed: the next `pnpm install` (`claude:install`) or `init` adds the line.
+
+- 4298850: The Jira ticket now follows its PR. Until now the jira adapter assigned the ticket and moved it to `In Progress` on `worktree:create`, and every later move was made by hand.
+  - New optional config `tracker.transitions` for the jira tracker, with two keys: `prOpened` (default `In Review`) and `merged` (default `Acceptance`). Each names the status the ticket moves to for that event; `null` turns that transition off. Wrong shapes and unknown keys are reported by `config:check`.
+  - New command `hassan-devkit tracker:transition <TICKET> <prOpened|merged>`. The ticket is a key or a branch name starting with it. The transition is looked up by target status name among the ticket's available transitions, and a ticket already in or past the target status is left alone. Best effort like the `worktree:create` hook: missing credentials, an unreachable Jira or a workflow without that transition is a `note:` and exit 0. An unknown event name is a usage error and exits 1.
+  - `worktree:prune` (and so every `worktree:create`) runs the `merged` transition for the ticket of each worktree it removes because its PR is merged. A merged worktree it cannot remove (stray changes) keeps its ticket where it is; the note names the `tracker:transition` call to run after the manual removal.
+  - The `github` and `none` trackers move nothing: an open PR stays the progress signal there.
+  - The generated `docs/agents/issue-tracker.md` for Jira describes both moves and the configured statuses. Re-run `hassan-devkit init --only agents` to refresh it.
+
+### Patch Changes
+
+- 695a31e: README: the companion template is described as what it now is. `hassan-devkit-template` is a maintained repository in the shape of a real project (a NestJS API with the error-code contract, an Angular staff app, a server-rendered Angular customer site and the shared libs), no longer the output of `hassan-devkit init` on an empty Nx workspace. `init` stays the way to adopt the devkit in a workspace that already exists. No code change.
+
 ## 1.4.0
 
 ### Minor Changes
