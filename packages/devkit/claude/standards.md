@@ -51,6 +51,10 @@ current request.** Finishing a task, an approved plan, or a skill whose instruct
 commit is NOT consent — leave the work uncommitted and report it as ready for review. Pushing
 requires its own explicit ask; consent to commit is not consent to push.
 
+Typing `/open-pr` is such an explicit ask, for the commits (the merge of the canonical `main`
+among them), the push and the PR in one go. Only the user can start that skill: it is not
+model-invocable, and you never follow its body on your own initiative.
+
 Once the user has asked to commit: every commit is planned by the `commit-writer` agent
 (`.claude/agents/commit-writer.md`) — invoke it on the full pending change set BEFORE staging
 anything, then execute its plan verbatim (stage the listed files, commit with the drafted

@@ -19,3 +19,8 @@ _Avoid_: unblocked ticket, available ticket, next ticket
 The first pull request of a project created from the template: the one that turns the template
 into that project.
 _Avoid_: initial PR, bootstrap PR, first PR
+
+**Unlinked dependency**:
+A dependency between two tickets that a ticket description states and the tracker holds no
+link for, so the ticket dependency chart misses it.
+_Avoid_: implicit dependency, hidden dependency, missing link

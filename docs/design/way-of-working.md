@@ -182,8 +182,9 @@ under `worktree.baseDir`, never nested.
 
 The ticket follows its PR through two events, in lifecycle order `prOpened` → `merged`.
 `tracker:transition <ticket> <prOpened|merged>` reports one (the ticket is a key or a branch
-name starting with it) and `worktree:prune` reports `merged` for the ticket of every worktree it
-removes. The jira adapter reads the ticket's status, then looks the transition up by target
+name starting with it): the `open-pr` skill reports `prOpened` once the PR is open, and
+`worktree:prune` reports `merged` for the ticket of every worktree it removes. The jira adapter
+reads the ticket's status, then looks the transition up by target
 status name among the ticket's available transitions (`GET /issue/<key>/transitions`,
 `to.name`). A ticket already in the target status, in a done status, or in the target status
 of a later event is left alone: a workflow that allows every transition would otherwise let a
@@ -230,6 +231,21 @@ returns tickets (key, title, status category, epic), epics (key, title) and bloc
   a failure exits 1. Only a single referenced issue that cannot be read is a `note:`.
 - Tests cover edge parsing, the issue → ticket mappings, scope, ready detection, the reduction
   and the rendering from fixtures; none calls a tracker.
+
+The command sees links only. An **unlinked dependency**, one that a ticket description states
+and no link records, is found by reading prose, which is a judgment: that part is the house
+skill `ticket-graph` (GH-55), not adapter code. The skill runs the command, reads the
+descriptions of the tickets on the chart, redraws the chart with the unlinked dependencies as
+dashed edges and lists each with the sentence it came from. A dependency is not proposed when
+the tracker already links it, when the chart implies it through a path of unfinished tickets
+(the reduction would drop that edge anyway), or when a done ticket, an epic or a sub-task sits
+at either end. The skill then asks which ones to record; that answer is the only consent for a
+tracker write. A confirmed dependency becomes the link the adapter reads (jira: a `Blocks` link
+with the blocker as inward issue; github: a `Blocked by #<n>` line appended to the issue body),
+and the command runs again, which also verifies the write: the dependency comes back as a solid
+arrow or a path of unfinished tickets, and one the chart's scope leaves out is read back from
+the tracker. The write stays in the skill (`gh`, the Jira issue-link call) and adds no adapter
+operation: it happens once per confirmed link, in front of the user.
 
 ### `ci:*`
 
@@ -288,7 +304,7 @@ contribution. Workbooks are written next to the data and stay gitignored.
   never changes; the content does.
 - **Skills**: the same stub pattern, one per skill, frontmatter copied verbatim from the body
   (name, description, `disable-model-invocation`, `argument-hint`). Two sources: house skills
-  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`) and the mattpocock skills, which the PROJECT
+  shipped in the package (`add-error-code`, `implement-ticket`, `merge-upstream`, `open-pr`, `ticket-graph`) and the mattpocock skills, which the PROJECT
   installs as the `mattpocock-skills` devDependency — `github:mattpocock/skills#v<tag>`, a GitHub
   tarball pinned to an upstream release tag that pnpm integrity-locks (no git binary, frozen
   installs work) — listed by its plugin manifest minus `implement` and `setup-matt-pocock-skills`.
@@ -300,6 +316,22 @@ contribution. Workbooks are written next to the data and stay gitignored.
   and the shared preset automerges it. A project stub with the plugin's bare name wins the bare
   slash command while the qualified plugin name still resolves to the plugin (verified against
   the CLI).
+- **`open-pr`** (GH-53): the one house skill that commits and pushes, and the only one with
+  `disable-model-invocation: true`. The consent rule needs the user's own words in the current
+  request; a skill Claude cannot start turns typing `/open-pr` into exactly that, for the
+  commits, the push and the PR in one go, so the prompt that closed every ticket (bring `main`
+  in, fix the conflicts, run the checks, commit, push, open the PR) is no longer typed by hand.
+  It composes what exists and adds no command: the `merge-upstream` skill, `ci:check` and
+  `ci:affected` on the working tree (pending work is checked before it is committed), the
+  `commit-writer` plan, `git push`, `gh pr create --assignee @me` with the title from the
+  branch's ticket and short title and the body from the `pr` skill ending with the tracker's
+  ticket reference (an open PR gets its body rewritten for the branch as it is now), then
+  `tracker:transition <ticket> prOpened`. It stops at the first failure and reports it, and
+  refuses to run on the base branch. One reordering: when uncommitted work collides with what
+  the merge brings in, a bare `merge-upstream` stops. Here the ask for the commits is already
+  given, so the pending work is checked and committed first, then merged, and the checks run
+  again on the merged result: nothing is committed unchecked. The `pr` skill ships with `mattpocock-skills` from v1.3; a project on an older
+  tag gets a plain body (what changed and why, how it was verified, what to review).
 - **Hooks**: merged into `.claude/settings.json` (committed, team-wide), not `settings.local.json`.
   The entries only name a dispatcher id (`hassan-devkit claude:hook <id>`); the rules behind them
   are package code (`core/claude-hooks.js`), unit-tested and released like any other rule, so a
@@ -314,7 +346,8 @@ contribution. Workbooks are written next to the data and stay gitignored.
 1. **Workflow** — Docker only via the npm scripts; ticket work only in worktrees created by
    `hassan-devkit worktree:create` off `<remote>/main`; never commit or push without the user's
    explicit ask in the current request (finishing a task, an approved plan or a skill's
-   instruction is not consent; push needs its own ask); plan every commit with the
+   instruction is not consent; push needs its own ask; typing `/open-pr`, which only the user
+   can start, is the explicit ask for the commits, the push and the PR); plan every commit with the
    `commit-writer` agent before staging; `gh pr create --assignee @me`; assign the ticket to
    yourself when you start it.
 2. **Quality gate** — no unit tests and no test steps in CI for application code; every
