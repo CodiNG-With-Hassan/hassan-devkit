@@ -2,7 +2,7 @@
 
 The way of working of Hassan's client projects as one versioned package: parallel git worktrees with isolated Docker stacks, the pre-commit chain, a CI job with commit standards and an Nx cache, the Claude Code standards/agents/hooks, and the bilingual acceptance-test workbooks. A project installs it, fills one config block in `package.json`, runs `hassan-devkit init`, and picks up every later standard by bumping the version. Design: `docs/design/way-of-working.md`; decisions: `docs/adr/`.
 
-New projects start from [hassan-devkit-template](https://github.com/CodiNG-With-Hassan/hassan-devkit-template), which is exactly what `init` produces on an Nx `apps/*` + `libs/*` pnpm workspace.
+New projects start from [hassan-devkit-template](https://github.com/CodiNG-With-Hassan/hassan-devkit-template): a maintained Nx `apps/*` + `libs/*` pnpm workspace in the shape of a real project (a NestJS API with the error-code contract, an Angular staff app, a server-rendered Angular customer site and the shared libs), already wired to this package. It reaches a running stack with `pnpm install` and `pnpm docker:dev:up`. `init` is for adopting the devkit in a workspace that already exists.
 
 ## Install
 

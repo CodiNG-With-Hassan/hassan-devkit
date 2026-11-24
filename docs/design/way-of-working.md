@@ -35,7 +35,7 @@ project picks it up by bumping the package version. Nothing else.
 | 8 | CI = thin scaffolded workflow whose steps call `hassan-devkit ci:*`; `ci:doctor` catches skeleton drift. |
 | 9 | Claude layer = CLAUDE.md `@import` from `node_modules` + runtime stubs for agents/skills; nothing to re-commit on a bump. |
 | 10 | Shipped house rules: workflow, quality gate, lint/format + Nx, domain docs + tracker adapters. |
-| 11 | Template repo is rewritten to the Nx layout via `hassan-devkit init`; bridal-store untouched. |
+| 11 | Template repo is rewritten to the Nx layout via `hassan-devkit init`; bridal-store untouched. Amended with GH-57: the template is a maintained repo in the shape of a real project, not `init` output (see "Template rewrite"). |
 | 12 | 0.x prereleases while car-rental dogfoods; 1.0.0 when car-rental runs fully on the package; semver after. |
 | 13 | Order: foundation → worktrees → pre-commit → CI → Claude → acceptance → template → 1.0. |
 | 14 | Package work = GitHub issues here, worked in worktrees with the `github` adapter. car-rental migration = one DAZ epic. |
@@ -365,11 +365,36 @@ below the import line.
 
 ## Template rewrite
 
-`hassan-devkit-template` becomes an Nx package-based workspace (`apps/api`, `apps/web`, an
-empty `libs/`), with the compose file using profiles and `DEVKIT_` ports, produced by running
-`hassan-devkit init` on a fresh Nx workspace and committing the result. "Use this template"
-then yields the full way of working. bridal-store stays on the flat layout and the old
-commands.
+`hassan-devkit-template` is a maintained repository with the shape new projects actually start
+from (GH-57). It is no longer the output of `hassan-devkit init` on an empty Nx workspace: that
+gave the way of working but no application, so new projects were scaffolded by hand from the
+newest existing one instead. `init` keeps its role for adopting the devkit in an existing
+workspace, and `ci:doctor` holds the template's scaffolded files to the installed devkit like
+any project's.
+
+- **Apps**: `apps/api` (NestJS with the error-code contract), `apps/web-admin` (Angular staff
+  app, browser-only) and `apps/web-customer` (Angular customer site, server-side rendered).
+- **Libs**, all consumed as source: `api-types` and `api-client` (generated from the committed
+  OpenAPI spec), `i18n` (the language list and the `ERRORS` catalog), `theme` (a PrimeNG preset
+  with a neutral placeholder ramp), `web-ui` (logo, theme and language switches, field errors,
+  the `translateError` pipe), `shared-utils` and `assets`.
+- **Stack**: the compose file with profiles (`api` by default, `customer`, `admin`, `extras`)
+  and `DEVKIT_` ports, one dev Dockerfile per app, the scaffolded CI workflow, the shared
+  Renovate preset, and one bilingual acceptance case per frontend.
+- **Placeholders**: the project name `template`, the ticket key `TPL` (GitHub tracker, so the
+  template's own issues are `TPL-<n>`), the package `tpl-i18n` and the default host ports. A new
+  project renames them; the `project-setup` skill (GH-60) will do it.
+- **No project copy of a house skill**: `add-error-code` comes from the devkit (GH-56); the
+  template keeps only `.claude/rules/api-errors.md`, which that skill reads for the project's
+  own names.
+- **It follows the devkit by itself**: its CI runs the commit standard, format, lint and
+  production builds on every pull request, and its `renovate.json` automerges
+  `@coding-with-hassan/*` bumps when that CI is green. A devkit release that breaks the template
+  shows up there as a red pull request; failing the devkit pull request itself, before the
+  release, is GH-58.
+
+"Use this template" yields a repository that reaches a running stack with `pnpm install` and
+`pnpm docker:dev:up` only. bridal-store stays on the flat layout and the old commands.
 
 ## Rollout
 
@@ -402,7 +427,8 @@ commands.
 
 car-rental has no hand-rolled counterpart left for any piece above, the template is produced
 by `init`, and a fresh clone of the template reaches a running stack with `pnpm install` +
-`pnpm docker:dev:up` only.
+`pnpm docker:dev:up` only. (These were the criteria 1.0.0 was released on. Since GH-57 the
+template is maintained by hand, see "Template rewrite"; the fresh-clone criterion still holds.)
 
 ## Known risks and notes
 
