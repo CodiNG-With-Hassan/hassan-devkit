@@ -34,7 +34,7 @@ project picks it up by bumping the package version. Nothing else.
 | 7 | Tracker adapters `jira`, `github`, `none` in 1.0; `prune` always uses `gh` PR state. |
 | 8 | CI = thin scaffolded workflow whose steps call `hassan-devkit ci:*`; `ci:doctor` catches skeleton drift. |
 | 9 | Claude layer = CLAUDE.md `@import` from `node_modules` + runtime stubs for agents/skills; nothing to re-commit on a bump. |
-| 10 | Shipped house rules: workflow, quality gate, lint/format + Nx, domain docs + tracker adapters. |
+| 10 | Shipped house rules: workflow, quality gate, lint/format + Nx, domain docs + tracker adapters. Amended with GH-71: grilling rounds are asked through the question dialog, and a house rule wins over a skill body (see "Shipped rules"). |
 | 11 | Template repo is rewritten to the Nx layout via `hassan-devkit init`; bridal-store untouched. Amended with GH-57: the template is a maintained repo in the shape of a real project, not `init` output (see "Template rewrite"). |
 | 12 | 0.x prereleases while car-rental dogfoods; 1.0.0 when car-rental runs fully on the package; semver after. |
 | 13 | Order: foundation → worktrees → pre-commit → CI → Claude → acceptance → template → 1.0. |
@@ -317,6 +317,24 @@ contribution. Workbooks are written next to the data and stay gitignored.
   and the shared preset automerges it. A project stub with the plugin's bare name wins the bare
   slash command while the qualified plugin name still resolves to the plugin (verified against
   the CLI).
+- **House rules over skill bodies** (GH-71): the upstream `grilling` body prints each round as
+  numbered text and waits for a typed reply, while Claude Code has a question dialog (the
+  `AskUserQuestion` tool) that is faster to answer and was only used when the user asked for
+  it in the session. The round format lives in one upstream file (`grill-me` and
+  `grill-with-docs` are wrappers, other skills start a grilling session as a step), so one
+  rule covers every session. That rule is in `standards.md` because the standards are the
+  only devkit content loaded on both paths: a project stub (`/grill-with-docs`) reads the
+  pinned dependency, the plugin-qualified name (`/mattpocock-skills:grill-with-docs`) reads
+  the developer's plugin copy and never touches the stub. Three alternatives were rejected.
+  An amendment appended to the generated grill stubs misses the plugin path, and an amended
+  stub no longer matches `isSkillStub`, so the next install would take it for the project's
+  own copy. A house `grilling` skill forks the body and stops receiving upstream changes
+  through Renovate. Changing the skill upstream does not fit: the dialog is a Claude Code
+  tool and the upstream skills target other agents too. The rule quotes no upstream wording,
+  since the round format changes between releases, and it replaces only how a question is
+  put to the user. Because the stubs say "follow it exactly", the standards state the
+  precedence once, for every rule: where a house rule and a skill body differ, the house rule
+  wins, and whatever the rule does not touch in the skill stands.
 - **`open-pr`** (GH-53): the one house skill that commits and pushes, and one of the two with
   `disable-model-invocation: true` (the other is `project-setup`). The consent rule needs the user's own words in the current
   request; a skill Claude cannot start turns typing `/open-pr` into exactly that, for the
@@ -421,6 +439,13 @@ contribution. Workbooks are written next to the data and stay gitignored.
 4. **Domain docs + tracker** — read `CONTEXT.md` and `docs/adr/` before exploring, use the
    glossary's terms, record decisions as ADRs only when hard to reverse, surprising and a real
    trade-off; use the generated `docs/agents/*.md` adapters.
+5. **Grilling through the question dialog** (GH-71) — in a grilling session, whichever skill
+   started it, every round and the closing confirmation are asked through Claude Code's
+   question dialog, not as the text format of the skill body: the options are the answers,
+   the recommended one first and the real alternatives with their trade-offs after it; every
+   question is self-contained; a round of more than four questions is several dialogs in one
+   turn; the skill's own text format is the fallback where the dialog is not available. Where
+   a house rule and a skill body differ, the house rule wins.
 
 Project specifics (framework rules, lib conventions, deployment) stay in the project's CLAUDE.md
 below the import line.
