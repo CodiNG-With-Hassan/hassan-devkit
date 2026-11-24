@@ -34,7 +34,8 @@ import { sanitizeName } from './derive.js';
  *     "testCases": { "dir": "docs/testing", "languages": ["en", "nl"], "title": "My Project" },
  *     "db": { "service": "db", "user": "postgres", "name": "app" },
  *     "docker": { "preUp": "..." },
- *     "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] }
+ *     "i18n": { "dir": "public/assets/i18n", "languages": ["en", "nl"] },
+ *     "design": { "url": "https://claude.ai/artifact/…" }   // the design system the `sync-theme` skill reads; it stores the link here
  *   }
  */
 
@@ -63,6 +64,7 @@ const isString = (v) => typeof v === 'string';
 const isNonEmptyString = (v) => isString(v) && v.trim().length > 0;
 const isBoolean = (v) => typeof v === 'boolean';
 const isInteger = (v) => Number.isInteger(v);
+const isHttpUrl = (v) => isNonEmptyString(v) && /^https?:\/\//.test(v);
 const isPort = (v) => isInteger(v) && v > 0 && v < 65536;
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isStringArray = (v) => Array.isArray(v) && v.every(isNonEmptyString);
@@ -77,7 +79,7 @@ export function validateConfig(raw) {
   if (raw === undefined) return errors;
   if (!isPlainObject(raw)) return [`${CONFIG_KEY}: expected an object`];
 
-  const known = ['worktree', 'tracker', 'commits', 'ci', 'testCases', 'db', 'docker', 'i18n'];
+  const known = ['worktree', 'tracker', 'commits', 'ci', 'testCases', 'db', 'docker', 'i18n', 'design'];
   for (const key of Object.keys(raw)) {
     if (!known.includes(key)) errors.push(`${CONFIG_KEY}.${key}: unknown key (known: ${known.join(', ')})`);
   }
@@ -137,7 +139,7 @@ export function validateConfig(raw) {
       if (!isNonEmptyString(tr.project) || !/^[A-Z][A-Z0-9_]*$/.test(tr.project)) {
         errors.push(`${CONFIG_KEY}.tracker.project: expected a Jira project key like "DAZ"`);
       }
-      expect(`${CONFIG_KEY}.tracker.baseUrl`, tr.baseUrl, (v) => isNonEmptyString(v) && /^https?:\/\//.test(v), 'an http(s) URL');
+      expect(`${CONFIG_KEY}.tracker.baseUrl`, tr.baseUrl, isHttpUrl, 'an http(s) URL');
       if (tr.transitions !== undefined) {
         const p = `${CONFIG_KEY}.tracker.transitions`;
         if (!isPlainObject(tr.transitions)) errors.push(`${p}: expected an object`);
@@ -239,6 +241,19 @@ export function validateConfig(raw) {
     }
   }
 
+  const design = raw.design;
+  if (design !== undefined) {
+    const p = `${CONFIG_KEY}.design`;
+    if (!isPlainObject(design)) errors.push(`${p}: expected an object`);
+    else {
+      // Only the link is declared: everything else is read from the design system itself.
+      for (const key of Object.keys(design)) {
+        if (key !== 'url') errors.push(`${p}.${key}: unknown key (known: url)`);
+      }
+      expect(`${p}.url`, design.url, isHttpUrl, 'an http(s) URL (the link of the design system)');
+    }
+  }
+
   return errors;
 }
 
@@ -300,8 +315,9 @@ export function resolveConfig(raw = {}, { rootName }) {
   const db = raw.db ? { service: raw.db.service, user: raw.db.user, name: raw.db.name } : null;
   const docker = { preUp: typeof raw.docker?.preUp === 'string' && raw.docker.preUp.trim() ? raw.docker.preUp.trim() : null };
   const i18n = { dir: raw.i18n?.dir ?? 'public/assets/i18n', languages: [...(raw.i18n?.languages ?? ['en', 'nl'])] };
+  const design = { url: raw.design?.url ?? null };
 
-  return { worktree, tracker, commits, ci, testCases, db, docker, i18n };
+  return { worktree, tracker, commits, ci, testCases, db, docker, i18n, design };
 }
 
 /**

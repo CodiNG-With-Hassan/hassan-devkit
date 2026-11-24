@@ -26,6 +26,7 @@ coverage/
 .claude/skills/prototype/
 .claude/skills/research/
 .claude/skills/resolving-merge-conflicts/
+.claude/skills/sync-theme/
 .claude/skills/tdd/
 .claude/skills/teach/
 .claude/skills/ticket-graph/
