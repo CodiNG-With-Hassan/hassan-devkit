@@ -16,7 +16,7 @@ A small ecosystem of shared developer-experience packages that I use across the 
 
 ## Companion template
 
-The [`hassan-devkit-template`](https://github.com/CodiNG-With-Hassan/hassan-devkit-template) repo is a GitHub *template* that already consumes all of the above. Click **Use this template** to scaffold a new client project.
+The [`hassan-devkit-template`](https://github.com/CodiNG-With-Hassan/hassan-devkit-template) repo is a GitHub *template* that already consumes all of the above. Click **Use this template** to scaffold a new client project, clone it, run `pnpm install` and type `/project-setup` in Claude Code: the skill renames the template's placeholders, writes the glossary and applies the design system, up to the project's setup PR.
 
 Every pull request here is checked against it: the `template` CI job installs the template's `main` on the packages of the pull request and runs the template's own checks, so a change that breaks the template fails before it is released. To run the same check locally, clone the template somewhere disposable and run `pnpm template:check <path-to-that-clone>` (it rewrites the clone's `pnpm-workspace.yaml` and lockfile). A change that needs a matching template change lands the template change first.
 
