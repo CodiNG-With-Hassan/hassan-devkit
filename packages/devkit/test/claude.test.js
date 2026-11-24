@@ -47,6 +47,16 @@ test('the shipped Claude content names no project', () => {
   for (const rule of ['Never commit or push unless', 'worktree:create', 'commit-writer', '--assignee @me', 'no unit-test quality gate', 'test-cases:generate', 'ci:check', 'CONTEXT.md']) {
     assert.ok(standards.includes(rule), `standards.md lacks "${rule}"`);
   }
+  // Grilling rounds go through the question dialog. The rule lives in the standards because they are the only devkit content loaded on both paths: a project stub and the plugin-qualified skill name.
+  assert.match(standards, /house rule and a skill body differ, the house rule\s+wins/, 'the precedence over a skill body is stated');
+  const grillingAt = standards.indexOf('\n## Grilling sessions: ask through the question dialog\n');
+  assert.ok(grillingAt > 0, 'standards.md lacks the grilling section');
+  const nextSection = standards.indexOf('\n## ', grillingAt + 1);
+  // Whitespace is collapsed so re-wrapping the prose never breaks a phrase.
+  const grilling = standards.slice(grillingAt, nextSection === -1 ? undefined : nextSection).replace(/\s+/g, ' ');
+  const grillingRules = ['whichever skill started it', 'plugin-qualified', 'the question dialog (the `AskUserQuestion` tool) instead of the text format', 'The rest of the skill stands', 'not for a yes or no', 'first option', '(Recommended)', 'trade-off', 'two to four options', 'never spend an option on "Other"', 'self-contained', 'more than four questions', 'several dialogs in the same turn', 'before the dialog opens', 'closing confirmation', 'not available', "fall back to the skill's own text format"];
+  for (const rule of grillingRules) assert.ok(grilling.includes(rule), `the grilling section lacks "${rule}"`);
+  assert.doesNotMatch(grilling, /❓|➡️/, 'the upstream round format is not quoted: it changes between releases');
   assert.doesNotMatch(readFileSync(join(pkgRoot, 'claude/skills/implement-ticket/SKILL.md'), 'utf8'), /^Commit your work/m);
   const merge = readFileSync(join(pkgRoot, 'claude/skills/merge-upstream/SKILL.md'), 'utf8');
   assert.doesNotMatch(merge, /^disable-model-invocation:/m, 'model-invocable: a user asking to bring main in is the consent');
