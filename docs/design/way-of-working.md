@@ -409,8 +409,22 @@ any project's.
 - **It follows the devkit by itself**: its CI runs the commit standard, format, lint and
   production builds on every pull request, and its `renovate.json` automerges
   `@coding-with-hassan/*` bumps when that CI is green. A devkit release that breaks the template
-  shows up there as a red pull request; failing the devkit pull request itself, before the
-  release, is GH-58.
+  shows up there as a red pull request.
+- **The devkit follows it too** (GH-58): the `template` job of this repo's CI fails a devkit
+  pull request that breaks the template, before anything is released. It checks out the
+  template's `main`, packs every publishable workspace package (`pnpm pack`, what the release
+  ships), points the template at the tarballs through pnpm overrides in its
+  `pnpm-workspace.yaml`, installs, and runs the template's own `format:check`, `lint` and
+  `build` (production) plus `hassan-devkit ci:doctor`. Every check runs even after one failed.
+  The logic is `scripts/template-check.mjs`, so the same run works locally against a throwaway
+  clone: `pnpm template:check <path>` (it rewrites that clone's workspace file and lockfile).
+  The job runs on the template's toolchain (its pnpm, its Node).
+  - A change that needs a matching template change says so in its pull request and lands the
+    template change first: the job always reads the template's `main`.
+  - One change cannot land template-first: a new workflow skeleton. The template's own
+    `ci:doctor` rejects it until the devkit that renders it is released, so that pull request
+    shows the `template` job red on the doctor step, and the template follows with
+    `hassan-devkit init --force` once the release is out.
 
 "Use this template" yields a repository that reaches a running stack with `pnpm install` and
 `pnpm docker:dev:up` only. bridal-store stays on the flat layout and the old commands.

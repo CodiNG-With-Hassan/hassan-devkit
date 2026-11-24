@@ -22,3 +22,38 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
+
+  # A devkit change that breaks hassan-devkit-template fails here, before it is released:
+  # the template's main is installed on the packages of this pull request and runs its own
+  # checks. The logic is scripts/template-check.mjs; this job only gives it the two checkouts
+  # and the template's toolchain (its pnpm, its Node).
+  template:
+    name: Template on the unreleased packages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # PRs may come from forks: read-only token, no secrets (the template is public).
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: devkit
+      - uses: actions/checkout@v5
+        with:
+          repository: CodiNG-With-Hassan/hassan-devkit-template
+          path: template
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: template/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: template/.nvmrc
+          cache: pnpm
+          cache-dependency-path: template/pnpm-lock.yaml
+      # pnpm switches to the version this repo pins; the script needs the root devDependencies.
+      - name: Install the devkit workspace
+        working-directory: devkit
+        run: pnpm install --frozen-lockfile
+      - name: Check the template on the unreleased packages
+        run: node devkit/scripts/template-check.mjs template

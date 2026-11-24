@@ -12,6 +12,10 @@ own `devkit` as a `workspace:*` devDependency, so the standards above, the `work
 
 - Design of the 1.0 line: `docs/design/way-of-working.md`, decisions in `docs/adr/`.
 - `devkit` is plain Node ESM with `node --test` on pure logic (`pnpm test`); no build step. The one exception is the shipped `hooks/pre-commit.sh`, exercised end to end in a throwaway git repo with a stub `pnpm` on PATH (`test/pre-commit.test.js`) — git plumbing only, never docker/gh/network.
+- The `template` CI job fails a pull request that breaks `hassan-devkit-template`: it runs
+  `scripts/template-check.mjs` (pure logic tested by `scripts/*.test.mjs`, part of `pnpm test`)
+  against the template's `main`. Run it locally with `pnpm template:check <throwaway clone>`;
+  a change that needs a matching template change lands the template change first.
 - Every user-visible change ships a `.changeset/*.md`; the shipped Claude content under
   `packages/devkit/claude/` must never name a client project (a test enforces it).
 - The mattpocock skills are not vendored: they are the root `mattpocock-skills` devDependency
