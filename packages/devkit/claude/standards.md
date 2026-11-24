@@ -5,6 +5,10 @@ These rules apply to every project that installs the devkit. They are loaded thr
 Commands are `hassan-devkit …` (run as `pnpm exec hassan-devkit …`); `docs/agents/*.md` are
 generated from the project's tracker config and name the concrete tracker.
 
+Skills run under these rules. Where a house rule and a skill body differ, the house rule wins,
+even when the skill's stub says to follow the body exactly; whatever the rule does not touch
+in the skill stands.
+
 ## Docker
 
 Always use the npm scripts from the root `package.json` for Docker operations — never run
@@ -126,3 +130,30 @@ glossary's terms and avoid the synonyms it lists; surface ADR contradictions ins
 silently overriding them. Record a decision as an ADR only when it is hard to reverse,
 surprising without context and the result of a real trade-off. Details:
 `docs/agents/domain.md`.
+
+## Grilling sessions: ask through the question dialog
+
+In a grilling session, whichever skill started it (`grilling` itself, a wrapper such as
+`grill-me` or `grill-with-docs`, a skill that grills as one of its steps; under its bare name
+or its plugin-qualified one), ask every round through the question dialog (the
+`AskUserQuestion` tool) instead of the text format the skill body gives. Only how a question
+is put to the user changes. The rest of the skill stands: the rounds, the frontier, looking
+facts up instead of asking for them, confirming the shared understanding before acting.
+
+- The options are the answers themselves: the question asks for the decision, not for a yes
+  or no on your recommendation. Your recommended answer is the first option, its label ending
+  in "(Recommended)". The other options are the real alternatives, each with its trade-off in
+  the description.
+- A question takes two to four options and the dialog adds a free-text answer itself, so never
+  spend an option on "Other". When a question has more real alternatives than fit, offer the
+  strongest and name the rest in the question. For an open question (a name, a number), offer
+  your recommended value and the nearest alternatives; the free-text answer covers the rest.
+- Every question is self-contained: it names what it is about and any finding it depends on.
+  The user may see only the dialog, not the text you wrote earlier in the turn.
+- One dialog takes at most four questions. A round with more than four questions is asked as
+  several dialogs in the same turn, one after the other: it is still one round.
+- Something the user must read before answering (a summary, a draft) is shown before the dialog
+  opens.
+- The closing confirmation of the shared understanding is asked through the dialog too.
+- When the dialog is not available (a non-interactive run, another agent harness), fall back
+  to the skill's own text format.
