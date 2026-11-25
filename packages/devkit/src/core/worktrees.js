@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { loadProfiles } from './compose.js';
-import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, ENV_FILE } from './config.js';
+import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, ENV_FILE, requireConfig, resolveConfig } from './config.js';
 import { expandEnv, imageTag, imageTagInputs, sanitizeName, ticketKeyFromBranch } from './derive.js';
 import { managedValues, parseEnv, writeManagedBlock } from './env-block.js';
 import { commandExists, run } from './exec.js';
@@ -156,6 +156,38 @@ export function stopSkipReason({ hasStack, managed, hasEnv }) {
   return null;
 }
 
+/**
+ * The `worktree` block `worktree:create` sets a new worktree up with: the worktree's `own`
+ * block, because its commit decides what its stack is (ports, profiles, ready, seeds, env) and
+ * the invoking checkout may be behind it. Only where worktrees live and how many slots exist
+ * is shared by every checkout, so those two stay the invoking checkout's.
+ */
+export function ownSettings(invoking, own) {
+  return { ...own, baseDir: invoking.baseDir, maxSlot: invoking.maxSlot };
+}
+
+/** Dotted keys on which two resolved `worktree` blocks differ, in the order the block lists them. */
+export function settingsDrift(a, b) {
+  const isRecord = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const walk = (x, y, path) => {
+    if (isRecord(x) && isRecord(y)) return [...new Set([...Object.keys(x), ...Object.keys(y)])].flatMap((k) => walk(x[k], y[k], path ? `${path}.${k}` : k));
+    return JSON.stringify(x) === JSON.stringify(y) ? [] : [path];
+  };
+  return walk(a, b, '');
+}
+
+/**
+ * The seed step of `worktree:create`: every entry has the `line` to print and the compose
+ * `exec` to run after it (`null`: nothing runs). Never empty, so the step is never silent: a
+ * stack that came up without its seed data looks the same as a seeded one until a login fails.
+ */
+export function seedPlan(seeds, { hasStack, up }) {
+  if (seeds.scripts.length === 0) return [{ line: 'no seed scripts configured (worktree.seeds.scripts)', exec: null }];
+  const why = !hasStack ? `no ${COMPOSE_FILE}, so no stack` : !up ? 'the stack was not started (--no-up)' : null;
+  if (why) return [{ line: `not seeding: ${why}; skipped ${seeds.scripts.map((s) => `pnpm ${s}`).join(', ')} (service ${seeds.service})`, exec: null }];
+  return seeds.scripts.map((script) => ({ line: `seeding: pnpm ${script} (service ${seeds.service})`, exec: ['exec', seeds.service, 'pnpm', script] }));
+}
+
 /** Dockerfiles of the buildable services, relative to `root` (extra image-tag inputs). */
 export function dockerfilesFromCompose(compose, root) {
   const files = new Set();
@@ -209,6 +241,20 @@ export function createContext(loaded, { log = console.log, note = (m) => console
     log,
     note,
   };
+}
+
+/**
+ * The context `worktree:create` sets the new worktree at `dir` up with: its own `package.json`
+ * and compose file (see `ownSettings`). The tracker stays the invoking checkout's: it is asked
+ * about the branch, not about the stack.
+ */
+function ownContext(ctx, dir) {
+  let loaded = requireConfig({ root: dir });
+  // A package.json without a name is named after its directory, here the branch: the defaults
+  // derived from the name would differ from the invoking checkout's for no reason.
+  if (!loaded.pkg.name) loaded = { ...loaded, rootName: ctx.rootName, config: resolveConfig(loaded.raw, { rootName: ctx.rootName }) };
+  const own = createContext(loaded, { log: ctx.log, note: ctx.note });
+  return { ...ctx, wt: ownSettings(ctx.wt, own.wt), hasStack: own.hasStack, compose: own.compose, known: own.known, drift: settingsDrift(ctx.wt, own.wt) };
 }
 
 // ───────────────────────── .env bookkeeping ─────────────────────────
@@ -402,7 +448,6 @@ export async function cmdEnv(ctx, { cwd = process.cwd(), slot: requestedSlot } =
 /** `worktree:create <branch>` */
 export async function cmdCreate(ctx, branch, { profiles: requested, up = true } = {}) {
   if (!branch) throw new Error('usage: hassan-devkit worktree:create <BRANCH> [--profiles a,b] [--no-up]');
-  const profiles = ctx.hasStack ? normalizeProfiles(requested ?? ctx.wt.profiles.default, { known: ctx.known, required: ctx.wt.profiles.required }) : [];
   await cmdPrune(ctx, {}); // reclaim merged-PR stacks (and their slots) before spending resources on a new one
   const wtDir = join(ctx.baseDir, branch);
   if (existsSync(wtDir)) throw new Error(`${wtDir} already exists`);
@@ -413,26 +458,46 @@ export async function cmdCreate(ctx, branch, { profiles: requested, up = true } 
   const fetched = await run('git', ['-C', ctx.mainRoot, 'fetch', remote, 'main'], { allowFailure: true });
   if (!fetched) throw new Error(`cannot fetch ${remote}/main — refusing to base new work on a possibly stale main`);
   const base = `refs/remotes/${remote}/main`;
-  if (git.branchExists(ctx.mainRoot, branch)) {
+  const existing = git.branchExists(ctx.mainRoot, branch);
+  if (existing) {
     await git.worktreeAdd(ctx.mainRoot, wtDir, { branch });
     if (!git.isAncestor(ctx.mainRoot, base, branch)) ctx.note(`existing branch ${branch} is behind ${remote}/main — merge it before starting work`);
   } else {
     await git.worktreeAdd(ctx.mainRoot, wtDir, { newBranch: branch, startPoint: base });
+  }
+
+  // From here on the worktree's own settings decide: the invoking checkout may be behind (or
+  // ahead of) the commit that was just checked out, and its stack settings belong to its commit.
+  let own;
+  let profiles;
+  try {
+    own = ownContext(ctx, wtDir);
+    profiles = own.hasStack ? normalizeProfiles(requested ?? own.wt.profiles.default, { known: own.known, required: own.wt.profiles.required }) : [];
+  } catch (e) {
+    // Nothing is spent yet (no slot, no ticket, no install): take the worktree back, so the
+    // retry is not refused because the directory already exists.
+    const removed = await git.worktreeRemove(ctx.mainRoot, wtDir, { force: true });
+    if (removed && !existing) await git.branchDelete(ctx.mainRoot, branch);
+    const left = removed ? 'the worktree was removed again' : `the worktree is still at ${wtDir} — remove it with: hassan-devkit worktree:remove ${branch} --force`;
+    throw new Error(`${e.message}\n(${branch} is set up from its own package.json and compose file; ${left})`, { cause: e });
+  }
+  if (own.drift.length) {
+    ctx.note(`"${CONFIG_KEY}.worktree" of this checkout differs from the new worktree's in ${own.drift.join(', ')} — the new worktree follows its own package.json, except for baseDir and maxSlot (this checkout's)`);
   }
   if (git.branchExists(ctx.mainRoot, 'main') && !git.isAncestor(ctx.mainRoot, base, 'main')) {
     ctx.note(`local main is behind ${remote}/main — sync it with: git checkout main && git merge --ff-only ${remote}/main`);
   }
 
   let slot = null;
-  if (ctx.hasStack) {
+  if (own.hasStack) {
     await withLock(
-      ctx.baseDir,
+      own.baseDir,
       '.slot.lock',
       'assigning a slot',
       120,
       async () => {
-        slot = pickFreeSlot(usedSlots(ctx), ctx.wt.maxSlot);
-        writeEnv(ctx, wtDir, slot, profiles);
+        slot = pickFreeSlot(usedSlots(own), own.wt.maxSlot);
+        writeEnv(own, wtDir, slot, profiles);
       },
       { log: ctx.log },
     );
@@ -449,19 +514,22 @@ export async function cmdCreate(ctx, branch, { profiles: requested, up = true } 
   }
 
   let values = null;
-  if (ctx.hasStack && up) {
-    await ensureImages(ctx, wtDir);
+  if (own.hasStack && up) {
+    await ensureImages(own, wtDir);
     await stack.compose(wtDir, ['up', '-d', '--build']);
     values = envOf(wtDir);
-    if (ctx.wt.ready) await stack.waitForUrl(expandEnv(ctx.wt.ready.url, values), ctx.wt.ready.timeoutSeconds, { log: ctx.log });
-    for (const script of ctx.wt.seeds.scripts) await stack.compose(wtDir, ['exec', ctx.wt.seeds.service, 'pnpm', script]);
+    if (own.wt.ready) await stack.waitForUrl(expandEnv(own.wt.ready.url, values), own.wt.ready.timeoutSeconds, { log: ctx.log });
+  }
+  for (const step of seedPlan(own.wt.seeds, { hasStack: own.hasStack, up })) {
+    ctx.log(step.line);
+    if (step.exec) await stack.compose(wtDir, step.exec); // a failing seed fails the command
   }
 
   ctx.log('');
   ctx.log(`Worktree ready: ${wtDir}${slot !== null ? ` (slot ${slot}, profiles: ${profiles.join(',')})` : ''}`);
   if (values) {
     for (const [k, v] of Object.entries(values)) if (k.startsWith('DEVKIT_PORT_')) ctx.log(`  ${k.slice('DEVKIT_PORT_'.length).toLowerCase().padEnd(14)} localhost:${v}`);
-    const optional = ctx.known.filter((p) => !ctx.wt.profiles.required.includes(p) && !profiles.includes(p));
+    const optional = own.known.filter((p) => !own.wt.profiles.required.includes(p) && !profiles.includes(p));
     if (optional.length) ctx.log(`  add a profile with: hassan-devkit worktree:profiles add ${optional.join('|')}`);
   }
   return { dir: wtDir, slot, profiles };
