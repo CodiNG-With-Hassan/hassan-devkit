@@ -39,6 +39,11 @@ listing is fine):
   budget shared by every session on the machine.
 - `hassan-devkit worktree:list` shows slots, ports and profiles; `worktree:remove <branch>`
   deletes the stack and its data; `worktree:prune` removes every worktree whose PR is merged.
+- A stack runs only while its ticket is being worked on. `hassan-devkit worktree:stop` stops the
+  checkout's containers and keeps them, their data, the slot and `.env`; `pnpm docker:dev:up`
+  starts the same stack again. `/open-pr` stops the stack once the PR is open, and
+  `worktree:prune` removes it once the PR is merged; start it again when review feedback needs
+  it.
 - Starting work anywhere else (an existing branch, the main checkout): sync first with
   `git fetch <remote> && git merge --ff-only <remote>/main`.
 - Bringing the canonical `main` into a branch is the `/merge-upstream` skill, run when the user

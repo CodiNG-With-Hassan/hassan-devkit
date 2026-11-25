@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: "From finished work to an open pull request in one go, the house way: bring the canonical main in, run ci:check and ci:affected, commit the pending work through the commit-writer plan, push, open the PR (or rewrite the body of the one already open) and report it to the tracker. User-typed only: typing /open-pr is the explicit ask for the commits, the push and the PR."
+description: "From finished work to an open pull request in one go, the house way: bring the canonical main in, run ci:check and ci:affected, commit the pending work through the commit-writer plan, push, open the PR (or rewrite the body of the one already open), report it to the tracker and stop the checkout's Docker stack. User-typed only: typing /open-pr is the explicit ask for the commits, the push and the PR."
 disable-model-invocation: true
 ---
 
@@ -14,8 +14,9 @@ ready to you), stop: that is not consent.
 
 Run the steps in order. Stop at the first failure and report it: the step, the output that
 shows the failure, and what is already done (merged, committed, pushed). Do not repair a failed
-check and carry on; the one exception is the hook rewrite in step 3. Never get past a step by
-going around it (`--no-verify`, a forced push).
+check and carry on; the one exception is the hook rewrite in step 3. Step 7 is the one step
+whose failure does not stop the skill. Never get past a step by going around it
+(`--no-verify`, a forced push).
 
 ## Before step 1: where you are
 
@@ -40,7 +41,7 @@ Run the `merge-upstream` skill, with these differences:
   commit it), run the merge again and resolve what conflicts, then run step 2 again on the
   merged result. Nothing is committed unchecked, and nothing unchecked is pushed.
 - Do not send its report. Keep the facts (range merged, conflicts resolved, installs run) for
-  step 7.
+  step 8.
 
 ## 2. Run what CI runs
 
@@ -102,9 +103,30 @@ hassan-devkit tracker:transition <TICKET> prOpened
 
 Run it whether the PR was created or updated; the branch name works as `<TICKET>`. The command
 is best effort by design: it exits 0, and a `note:` means the tracker moved nothing. Pass the
-note on in step 7; it is not a failure. Skip this step with the tracker `none`.
+note on in step 8; it is not a failure. Skip this step with the tracker `none`.
 
-## 7. Report
+## 7. Stop the stack
+
+```sh
+hassan-devkit worktree:stop
+```
+
+Run it whether the PR was created or updated. The PR now waits for review, and until then the
+checkout's containers only hold Docker memory that every session on the machine shares. The
+command stops them and removes nothing: the containers, their data, the slot and `.env` stay,
+and `pnpm docker:dev:up` from the checkout's root starts the same stack again. Removing the
+stack is not part of this skill; `hassan-devkit worktree:prune` does that once the PR is
+merged. Where the checkout has no stack of its own the command says why, stops nothing and
+exits 0.
+
+A non-zero exit here is not a failure of the skill: the PR is open. Keep the output for step 8
+and do not try another way to stop the stack.
+
+## 8. Report
 
 The PR link first. Then, briefly: created or updated, what step 1 merged (or that the branch
-was up to date), the commits made, and any `note:` from step 6.
+was up to date), the commits made, and any `note:` from step 6. Last, what step 7 did, one of:
+
+- the stack is stopped, and `pnpm docker:dev:up` starts it again;
+- nothing was stopped, with the reason the command gave;
+- `note:` the stop failed and the stack is still running, with the command's output.
