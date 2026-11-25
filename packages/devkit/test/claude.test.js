@@ -64,13 +64,23 @@ test('the shipped Claude content names no project', () => {
   // open-pr commits, pushes and opens the PR: only the user can start it, and the standards name it as an explicit ask.
   const openPr = readFileSync(join(pkgRoot, 'claude/skills/open-pr/SKILL.md'), 'utf8');
   assert.match(openPr, /^disable-model-invocation: true$/m, 'user-invocable only: typing /open-pr is the consent');
-  const openPrSteps = ['base branch', 'the `merge-upstream` skill', 'hassan-devkit ci:check', 'hassan-devkit ci:affected', '`commit-writer` agent', 'git push', 'gh pr create --assignee @me', 'the `pr` skill', 'Closes #<n>', 'gh pr edit', 'hassan-devkit tracker:transition', 'prOpened', 'Stop at the first failure'];
+  const openPrSteps = ['base branch', 'the `merge-upstream` skill', 'hassan-devkit ci:check', 'hassan-devkit ci:affected', '`commit-writer` agent', 'git push', 'gh pr create --assignee @me', 'the `pr` skill', 'Closes #<n>', 'gh pr edit', 'hassan-devkit tracker:transition', 'prOpened', 'hassan-devkit worktree:stop', 'Stop at the first failure'];
   for (const step of openPrSteps) assert.ok(openPr.includes(step), `open-pr lacks "${step}"`);
   assert.match(openPr, /On the base branch[^.]*refuse/, 'open-pr refuses to run on the base branch');
   const firstStep = openPr.indexOf('## 1.');
   assert.ok(firstStep > 0, 'open-pr numbers its steps from "## 1."');
   const order = openPrSteps.slice(1, -1).map((step) => openPr.indexOf(step, firstStep));
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the steps come in the order they run');
+  // The stack is stopped once the PR is open and removed when it merges: stopping is never a teardown, and a failed stop never fails the skill.
+  const reportAt = openPr.indexOf('## 8. Report');
+  assert.ok(reportAt > firstStep, 'the report is step 8, after the stop');
+  const stopStep = openPr.slice(openPr.indexOf('## 7.', firstStep), reportAt).replace(/\s+/g, ' ');
+  for (const rule of ['hassan-devkit worktree:stop', 'whether the PR was created or updated', 'removes nothing', 'pnpm docker:dev:up', 'hassan-devkit worktree:prune', 'is not a failure of the skill']) assert.ok(stopStep.includes(rule), `the stop step of open-pr lacks "${rule}"`);
+  const report = openPr.slice(reportAt).replace(/\s+/g, ' ');
+  for (const rule of ['the stack is stopped', 'pnpm docker:dev:up', 'nothing was stopped', '`note:` the stop failed']) assert.ok(report.includes(rule), `the report of open-pr lacks "${rule}"`);
+  assert.doesNotMatch(openPr, /step 7[^.]*report|for\s+step 7/i, 'no reference still calls the report step 7');
+  assert.doesNotMatch(openPr, /docker:dev:down|worktree:remove/, 'open-pr stops the stack, it never removes it');
+  assert.match(standards.replace(/\s+/g, ' '), /`\/open-pr` stops the stack[^.]*`worktree:prune` removes/, 'the standards say when a stack stops and when it is removed');
   assert.match(standards, /`\/open-pr`[^.]*explicit ask/, 'the consent rule names /open-pr');
   assert.ok(merge.includes('typing `/open-pr`'), 'merge-upstream knows the caller whose ask covers its merge commit');
   // add-error-code is generic: every path comes from the workspace, none is written down.

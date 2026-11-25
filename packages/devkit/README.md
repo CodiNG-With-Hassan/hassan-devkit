@@ -111,6 +111,7 @@ One worktree per ticket, each with its own Docker stack (own compose project, ho
 - `hassan-devkit worktree:create <BRANCH> [--profiles a,b] [--no-up]` — prune merged worktrees, fetch `upstream`/`origin` `main`, add the worktree off it, allocate the lowest free slot (under a lock), write the managed `.env`, run the tracker hook, `pnpm install`, bootstrap husky (fails loudly if `.husky/_/pre-commit` is missing), build the images the tag lacks, `up`, wait for `worktree.ready.url`, run `worktree.seeds`.
 - `hassan-devkit worktree:env [--slot N]` — refresh this checkout's managed block (keeps slot + profiles, recomputes the image tag, builds missing images, drops stale `node_modules` volumes). Refuses a slot another checkout holds. `docker:up` runs it implicitly.
 - `hassan-devkit worktree:profiles list|add|remove <names>` — the compose profiles this stack runs (derived from the compose file; `worktree.profiles.required` cannot be removed).
+- `hassan-devkit worktree:stop` — stop the stack of the checkout it is run from (`docker compose stop` across every profile) and keep everything: containers, volumes, slot and `.env`. `pnpm docker:dev:up` starts the same stack again. It stops only a stack the devkit manages for that checkout: without a compose file, with an empty `worktree` block or without a `.env` it says why, stops nothing and exits 0. A stop that fails exits 1. `/open-pr` runs it once the PR is open.
 - `hassan-devkit worktree:remove <BRANCH> [--keep-data] [--force]` — stack down (volumes deleted unless `--keep-data`), worktree removed, branch kept, unreferenced image tags garbage-collected.
 - `hassan-devkit worktree:prune [--dry-run]` — remove every worktree whose PR is merged (`gh pr list --head`, base repo = `upstream`) and report `merged` to the tracker for its ticket; dirty trees are never force-removed.
 - `hassan-devkit worktree:list` — worktrees with slot, ports, profiles, image tag; warns on duplicate slots.
@@ -199,7 +200,8 @@ The hook never rewrites silently. lint-staged re-stages the fixes `eslint --fix`
 4. `git push -u origin <branch>`, never forced;
 5. no open PR for the branch: `gh pr create --assignee @me`, titled `<TICKET> <Short title>` from the branch name, with a body written with the `pr` skill and ending with the tracker's ticket reference (`Closes #<n>` for GitHub); a PR already open: its body rewritten for the branch as it is now;
 6. `hassan-devkit tracker:transition <TICKET> prOpened`;
-7. the PR link.
+7. `hassan-devkit worktree:stop`: the checkout's stack is stopped while the PR waits for review, so it no longer holds Docker memory. Nothing is removed (`worktree:prune` does that once the PR is merged), and `pnpm docker:dev:up` starts it again when review feedback needs it. A failed stop is reported and does not fail the skill;
+8. the PR link.
 
 It refuses to run on the base branch. When uncommitted work collides with what the merge brings in, a bare `merge-upstream` stops; here the ask for the commits is given, so the pending work is checked and committed first, then merged, and the checks run again on the merged result. The `pr` skill ships with `mattpocock-skills` from v1.3; on an older tag the body is a plain one (what changed and why, how it was verified, what to review).
 

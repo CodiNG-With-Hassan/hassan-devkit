@@ -1,5 +1,5 @@
 import { requireConfig } from '../core/config.js';
-import { cmdCreate, cmdEnv, cmdList, cmdProfiles, cmdPrune, cmdRemove, createContext } from '../core/worktrees.js';
+import { cmdCreate, cmdEnv, cmdList, cmdProfiles, cmdPrune, cmdRemove, cmdStop, createContext } from '../core/worktrees.js';
 import { exitOnFailure } from '../util/run.js';
 
 // Config loading may throw synchronously; run every action through a promise so the
@@ -21,6 +21,11 @@ export function registerWorktree(cli) {
   cli
     .command('worktree:profiles [action] [...names]', 'list | add <names> | remove <names> — which compose profiles this stack runs')
     .action((action, names) => withCtx((ctx) => cmdProfiles(ctx, action ?? 'list', names ?? [])));
+
+  // No context here: unlike its siblings, `stop` succeeds where the `worktree` block is missing.
+  cli
+    .command('worktree:stop', "Stop this checkout's stack; containers, volumes, slot and .env are kept (docker:up starts it again)")
+    .action(() => exitOnFailure(Promise.resolve().then(() => cmdStop(requireConfig()))));
 
   cli
     .command('worktree:remove <name>', 'Stack down (volumes deleted unless --keep-data) and remove the worktree; the branch is kept')
