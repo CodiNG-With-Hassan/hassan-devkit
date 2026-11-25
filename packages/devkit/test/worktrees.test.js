@@ -7,11 +7,14 @@ import {
   imageRepo,
   imagesFor,
   normalizeProfiles,
+  ownSettings,
   ownedImageRepos,
   pickFreeSlot,
   projectNameFor,
   projectVolumes,
   pruneDecision,
+  seedPlan,
+  settingsDrift,
   staleVolumes,
   stopSkipReason,
   unreferencedImages,
@@ -136,4 +139,63 @@ test('stopSkipReason: only a stack the devkit manages for this checkout is stopp
   assert.match(stopSkipReason({ hasStack: false, managed: false, hasEnv: true }), /no stack/, 'a .env alone is not a stack');
   assert.match(stopSkipReason({ hasStack: true, managed: false, hasEnv: true }), /not managed per checkout/, 'a missing or skeleton worktree block: the stack may be shared');
   assert.match(stopSkipReason({ hasStack: true, managed: true, hasEnv: false }), /no stack of its own/, "without the managed .env the project name could be another checkout's");
+});
+
+test('seedPlan: the seed step always says what it does', () => {
+  const seeds = { service: 'api', scripts: ['seed:dev', 'seed:catalog'] };
+  assert.deepEqual(seedPlan(seeds, { hasStack: true, up: true }), [
+    { line: 'seeding: pnpm seed:dev (service api)', exec: ['exec', 'api', 'pnpm', 'seed:dev'] },
+    { line: 'seeding: pnpm seed:catalog (service api)', exec: ['exec', 'api', 'pnpm', 'seed:catalog'] },
+  ]);
+  assert.deepEqual(seedPlan({ service: null, scripts: [] }, { hasStack: true, up: true }), [{ line: 'no seed scripts configured (worktree.seeds.scripts)', exec: null }]);
+  // Configured scripts that cannot run are named, not dropped.
+  assert.deepEqual(seedPlan(seeds, { hasStack: true, up: false }), [{ line: 'not seeding: the stack was not started (--no-up); skipped pnpm seed:dev, pnpm seed:catalog (service api)', exec: null }]);
+  assert.deepEqual(seedPlan(seeds, { hasStack: false, up: true }), [{ line: 'not seeding: no docker/docker-compose.dev.yml, so no stack; skipped pnpm seed:dev, pnpm seed:catalog (service api)', exec: null }]);
+  assert.deepEqual(seedPlan({ service: null, scripts: [] }, { hasStack: false, up: false }), [{ line: 'no seed scripts configured (worktree.seeds.scripts)', exec: null }]);
+});
+
+// The `worktree` block as `resolveConfig` returns it.
+const block = (over = {}) => ({
+  baseDir: '../app-worktrees',
+  maxSlot: 30,
+  projectName: 'app',
+  ports: { api: 3000 },
+  profiles: { default: ['api'], required: ['api'] },
+  seeds: { service: null, scripts: [] },
+  ready: null,
+  env: {},
+  ...over,
+});
+
+test("ownSettings: a new worktree's stack follows its own package.json, not the invoking checkout's", () => {
+  // The invoking checkout is still on the scaffold commit; the remote main configures the stack.
+  const invoking = block({ baseDir: '../elsewhere', maxSlot: 5 });
+  const own = block({
+    ports: { api: 3000, mail: 8025 },
+    profiles: { default: ['api', 'web'], required: ['api'] },
+    seeds: { service: 'api', scripts: ['seed:dev'] },
+    ready: { url: 'http://localhost:${DEVKIT_PORT_API}/health', timeoutSeconds: 600 },
+  });
+  const settings = ownSettings(invoking, own);
+  assert.deepEqual(settings.seeds, { service: 'api', scripts: ['seed:dev'] });
+  assert.deepEqual(settings.ready, { url: 'http://localhost:${DEVKIT_PORT_API}/health', timeoutSeconds: 600 });
+  assert.deepEqual(settings.profiles.default, ['api', 'web']);
+  assert.deepEqual(settings.ports, { api: 3000, mail: 8025 }, 'the ports its compose file reads');
+  // Where worktrees live and how many slots exist is shared by every checkout.
+  assert.equal(settings.baseDir, '../elsewhere');
+  assert.equal(settings.maxSlot, 5);
+});
+
+test('settingsDrift names the keys on which two worktree blocks differ', () => {
+  assert.deepEqual(settingsDrift(block(), block()), []);
+  const own = block({
+    ports: { api: 3000, mail: 8025 },
+    profiles: { default: ['api', 'web'], required: ['api'] },
+    seeds: { service: 'api', scripts: ['seed:dev'] },
+    ready: { url: 'http://localhost:3000/health', timeoutSeconds: 600 },
+  });
+  assert.deepEqual(settingsDrift(block(), own), ['ports.mail', 'profiles.default', 'seeds.service', 'seeds.scripts', 'ready']);
+  assert.deepEqual(settingsDrift(block({ ready: { url: 'http://a', timeoutSeconds: 60 } }), block({ ready: { url: 'http://a', timeoutSeconds: 90 } })), ['ready.timeoutSeconds']);
+  assert.deepEqual(settingsDrift(block({ env: { A: '1', B: '2' } }), block({ env: { B: '2' } })), ['env.A'], 'a key only one side has');
+  assert.deepEqual(settingsDrift(block({ maxSlot: 5 }), block()), ['maxSlot']);
 });
