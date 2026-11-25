@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { loadProfiles } from './compose.js';
-import { CONFIG_KEY, ENV_DIST_FILE, ENV_FILE } from './config.js';
+import { COMPOSE_FILE, CONFIG_KEY, ENV_DIST_FILE, ENV_FILE } from './config.js';
 import { expandEnv, imageTag, imageTagInputs, sanitizeName, ticketKeyFromBranch } from './derive.js';
 import { managedValues, parseEnv, writeManagedBlock } from './env-block.js';
 import { commandExists, run } from './exec.js';
@@ -133,6 +133,27 @@ export function pruneDecision(states) {
   if (states.includes('OPEN')) return 'open';
   if (states.includes('MERGED')) return 'merged';
   return 'closed';
+}
+
+/**
+ * A compose call that reaches the containers of every profile, whatever `.env` lists. The
+ * shell env wins over --env-file, so `COMPOSE_PROFILES` always gets a value: a .env from
+ * before profiles were mandatory must not block its own stop or teardown on the compose guard.
+ */
+export function everyProfile(args, { known, shellProfiles = process.env.COMPOSE_PROFILES }) {
+  return { args: ['--profile', '*', ...args], env: { COMPOSE_PROFILES: shellProfiles || known[0] || 'devkit' } };
+}
+
+/**
+ * Why `worktree:stop` leaves this checkout alone, or `null` when it has a stack to stop.
+ * Only a stack the devkit manages per checkout is stopped: without the managed `.env` the
+ * compose project is not this checkout's own, and a stop could hit another checkout's stack.
+ */
+export function stopSkipReason({ hasStack, managed, hasEnv }) {
+  if (!hasStack) return `no ${COMPOSE_FILE}: this repo has no stack`;
+  if (!managed) return `"${CONFIG_KEY}.worktree" is not filled in: the stack is not managed per checkout`;
+  if (!hasEnv) return `no ${ENV_FILE}: this checkout has no stack of its own`;
+  return null;
 }
 
 /** Dockerfiles of the buildable services, relative to `root` (extra image-tag inputs). */
@@ -312,12 +333,8 @@ export function pruneImages(ctx) {
 
 /** `down` across every profile (nothing left behind); `wipe` also removes volumes. */
 export async function stackDown(ctx, dir, { wipe }) {
-  const ok = await stack.compose(dir, ['--profile', '*', 'down', ...(wipe ? ['-v'] : []), '--remove-orphans'], {
-    // The shell env wins over --env-file: a .env from before profiles were mandatory must
-    // not block its own teardown on the compose guard.
-    env: { COMPOSE_PROFILES: process.env.COMPOSE_PROFILES || ctx.known[0] || 'devkit' },
-    allowFailure: true,
-  });
+  const call = everyProfile(['down', ...(wipe ? ['-v'] : []), '--remove-orphans'], { known: ctx.known });
+  const ok = await stack.compose(dir, call.args, { env: call.env, allowFailure: true });
   if (!ok) ctx.note(`compose down failed in ${dir} — check 'docker ps -a' for leftovers`);
   if (wipe) {
     const project = envOf(dir).COMPOSE_PROJECT_NAME;
@@ -488,6 +505,29 @@ export async function cmdProfiles(ctx, action = 'list', names = [], { cwd = proc
     default:
       throw new Error('usage: hassan-devkit worktree:profiles list|add|remove [name ...]');
   }
+}
+
+/**
+ * `worktree:stop` — stop this checkout's stack across every profile. The containers stay, with
+ * their volumes, the slot and `.env`, so `docker:up` starts the same stack again. Takes the
+ * loaded config, not a context: where there is nothing to stop it says why and succeeds, also
+ * in a repo whose `worktree` block is missing. A stop that fails throws.
+ */
+export async function cmdStop(loaded, { log = console.log } = {}) {
+  const dir = loaded.root;
+  const hasStack = stack.hasComposeFile(dir);
+  const skip = stopSkipReason({
+    hasStack,
+    managed: hasStack && worktreeActive(loaded.config.worktree, { hasStack }),
+    hasEnv: existsSync(join(dir, ENV_FILE)),
+  });
+  if (skip) {
+    log(`${skip} — nothing stopped`);
+    return;
+  }
+  const call = everyProfile(['stop'], { known: createContext(loaded, { log }).known });
+  await stack.compose(dir, call.args, { env: call.env });
+  log(`stopped the stack of ${dir} (containers and data kept) — start it again with: pnpm docker:dev:up`);
 }
 
 /** `worktree:remove <name>` — stack down (volumes gone unless --keep-data), worktree removed, branch kept. */

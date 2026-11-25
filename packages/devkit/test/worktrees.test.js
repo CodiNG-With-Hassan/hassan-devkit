@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { deriveProfiles } from '../src/core/compose.js';
 import {
   dockerfilesFromCompose,
+  everyProfile,
   imageRepo,
   imagesFor,
   normalizeProfiles,
@@ -12,6 +13,7 @@ import {
   projectVolumes,
   pruneDecision,
   staleVolumes,
+  stopSkipReason,
   unreferencedImages,
   validateSlot,
   worktreeActive,
@@ -119,4 +121,19 @@ test('worktreeActive: an empty skeleton is inert in a compose repo, active witho
   assert.equal(worktreeActive(skeleton, { hasStack: false }), true, 'no compose file → nothing to take over');
   assert.equal(worktreeActive({ ...skeleton, ports: { api: 3000 } }, { hasStack: true }), true);
   assert.equal(worktreeActive({ ...skeleton, profiles: { default: ['api'], required: [] } }, { hasStack: true }), true);
+});
+
+test('everyProfile reaches every profile and always gives the profiles guard a value', () => {
+  // `--profile *` stops a container whose profile is no longer listed in .env.
+  assert.deepEqual(everyProfile(['stop'], { known: ['api', 'web'], shellProfiles: undefined }), { args: ['--profile', '*', 'stop'], env: { COMPOSE_PROFILES: 'api' } });
+  assert.deepEqual(everyProfile(['down', '-v'], { known: ['api'], shellProfiles: 'web' }), { args: ['--profile', '*', 'down', '-v'], env: { COMPOSE_PROFILES: 'web' } }, 'the shell value wins');
+  assert.deepEqual(everyProfile(['stop'], { known: [], shellProfiles: '' }).env, { COMPOSE_PROFILES: 'devkit' }, 'a compose file without profiles still gets a value');
+});
+
+test('stopSkipReason: only a stack the devkit manages for this checkout is stopped', () => {
+  assert.equal(stopSkipReason({ hasStack: true, managed: true, hasEnv: true }), null);
+  assert.match(stopSkipReason({ hasStack: false, managed: false, hasEnv: false }), /no stack/, 'a repo without a compose file');
+  assert.match(stopSkipReason({ hasStack: false, managed: false, hasEnv: true }), /no stack/, 'a .env alone is not a stack');
+  assert.match(stopSkipReason({ hasStack: true, managed: false, hasEnv: true }), /not managed per checkout/, 'a missing or skeleton worktree block: the stack may be shared');
+  assert.match(stopSkipReason({ hasStack: true, managed: true, hasEnv: false }), /no stack of its own/, "without the managed .env the project name could be another checkout's");
 });
