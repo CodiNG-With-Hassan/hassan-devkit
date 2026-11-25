@@ -166,6 +166,7 @@ import line, `.claude/agents` + `.claude/skills` stubs, the `.claude/settings.js
 | `create <BRANCH> [--profiles a,b] [--no-up]` | `prune` first; fetch `upstream`/`origin`; worktree off `<remote>/main` (reuse an existing branch); allocate the lowest free slot under a lock; write `.env`; tracker hook; `pnpm install`; `pnpm exec husky` and hard-fail if `.husky/_/pre-commit` is missing; build missing images under the build lock; `compose up`; wait for `worktree.ready.url`; run `worktree.seeds`; print URLs. No compose file → the stack steps are skipped (this repo dogfoods that path). |
 | `env [--slot N]` | Recompute the managed block for the current checkout keeping slot + profiles; refuse a slot another checkout holds; build missing images; drop `node_modules` volumes of stale tags; warn on missing `node_modules` / `.husky/_`. `docker:up` runs this implicitly when `worktree` is configured, so the `docker.preUp` hook is no longer needed for it. |
 | `profiles list\|add\|remove` | Mutate `COMPOSE_PROFILES`; `add` ups the new services, `remove` stops them; `profiles.required` cannot be removed. |
+| `stop` | `compose stop` across all profiles for the current checkout: the containers stop and stay, with their volumes, the slot and `.env`, so `docker:up` starts the same stack again. Only a stack managed for this checkout is stopped: no compose file, a missing or skeleton `worktree` block (the stack may be shared between checkouts) or no `.env` (the compose project would not be this checkout's own) → the reason is printed, nothing is stopped, exit 0. It is the one `worktree:*` command that does not fail on a missing `worktree` block. A failed stop exits 1. The `open-pr` skill runs it once the PR is open (GH-73). |
 | `remove <name> [--keep-data] [--force]` | Stack down (`-v` unless `--keep-data`) across all profiles, `git worktree remove`, GC unreferenced image tags. Branch kept. |
 | `prune [--dry-run]` | For every worktree ask `gh pr list --repo <base> --head <branch> --state all` (never `pr view`, which cannot see fork heads); only `MERGED` removes stack, worktree and branch, and then reports `merged` to the tracker for the removed worktree's ticket. Dirty worktrees are never force-removed. |
 | `list` | `git worktree list` + slot/ports/profiles/tag per checkout + duplicate-slot warnings. |
@@ -340,14 +341,19 @@ contribution. Workbooks are written next to the data and stay gitignored.
   request; a skill Claude cannot start turns typing `/open-pr` into exactly that, for the
   commits, the push and the PR in one go, so the prompt that closed every ticket (bring `main`
   in, fix the conflicts, run the checks, commit, push, open the PR) is no longer typed by hand.
-  It composes what exists and adds no command: the `merge-upstream` skill, `ci:check` and
+  It composes what exists: the `merge-upstream` skill, `ci:check` and
   `ci:affected` on the working tree (pending work is checked before it is committed), the
   `commit-writer` plan, `git push`, `gh pr create --assignee @me` with the title from the
   branch's ticket and short title and the body from the `pr` skill ending with the tracker's
   ticket reference (an open PR gets its body rewritten for the branch as it is now), then
-  `tracker:transition <ticket> prOpened`. It stops at the first failure and reports it, and
-  refuses to run on the base branch. One reordering: when uncommitted work collides with what
-  the merge brings in, a bare `merge-upstream` stops. Here the ask for the commits is already
+  `tracker:transition <ticket> prOpened`, then `worktree:stop` (GH-73). It stops at the first
+  failure and reports it, and refuses to run on the base branch. The stack is stopped because
+  a PR waiting for review needs no running containers, and Docker memory is shared by every
+  session on the machine. It is stopped, not removed: review feedback often needs the same
+  data again, so removal stays with `worktree:prune` once the PR is merged. The stop is the
+  last step, so a failed check or push leaves the stack running for the fix, and a failed stop
+  is reported without failing the skill, because the PR is already open. One reordering:
+  when uncommitted work collides with what the merge brings in, a bare `merge-upstream` stops. Here the ask for the commits is already
   given, so the pending work is checked and committed first, then merged, and the checks run
   again on the merged result: nothing is committed unchecked. The `pr` skill ships with `mattpocock-skills` from v1.3; a project on an older
   tag gets a plain body (what changed and why, how it was verified, what to review).
@@ -424,8 +430,9 @@ contribution. Workbooks are written next to the data and stay gitignored.
 ### Shipped rules (`claude/standards.md`)
 
 1. **Workflow** — Docker only via the npm scripts; ticket work only in worktrees created by
-   `hassan-devkit worktree:create` off `<remote>/main`; never commit or push without the user's
-   explicit ask in the current request (finishing a task, an approved plan or a skill's
+   `hassan-devkit worktree:create` off `<remote>/main`; a stack is stopped (`worktree:stop`)
+   once its PR is open and removed (`worktree:prune`) once it is merged; never commit or push
+   without the user's explicit ask in the current request (finishing a task, an approved plan or a skill's
    instruction is not consent; push needs its own ask; typing `/open-pr`, which only the user
    can start, is the explicit ask for the commits, the push and the PR); plan every commit with the
    `commit-writer` agent before staging; `gh pr create --assignee @me`; assign the ticket to
